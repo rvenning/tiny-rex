@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+<title>Tiny Rex 🦖 — Eat Small, Grow Big</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2b1f14">
+<meta name="description" content="Hatch tiny in a prehistoric valley. Eat anything smaller than you, keep away from anything bigger, and grow all the way up to a Mighty Rex.">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tiny Rex">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lib/gk-base.css">
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦖</text></svg>">
+</head>
+<body>
+
+<!-- Splash -->
+<div class="screen active" id="screen-splash">
+  <div class="splash-inner">
+    <div class="splash-egg" aria-hidden="true">🥚🦖🦕</div>
+    <h1 class="logo">TINY<span>REX</span></h1>
+    <p class="tagline">Eat anything smaller. Run from anything bigger. Grow.</p>
+    <button class="btn big" id="btn-continue-as" style="display:none"></button>
+    <button class="btn big" id="btn-start" onclick="App.play()">🥚 Start Hatching</button>
+    <button class="btn ghost" id="btn-install" style="display:none">📲 Add to Home Screen</button>
+    <p class="keys-hint">Tap or drag to run. Arrow keys work too.</p>
+    <div class="splash-foot">
+      <span id="sync-badge">…</span>
+      <button class="btn-sound icon-btn">🔊</button>
+    </div>
+  </div>
+</div>
+
+<!-- Profile picker (roster + PIN modals rendered by GK.Profiles) -->
+<div class="screen" id="screen-profiles">
+  <header class="bar">
+    <button class="icon-btn" onclick="GK.UI.showScreen('splash')" aria-label="Back">←</button>
+    <h2>Who's hunting?</h2>
+    <button class="btn-sound icon-btn">🔊</button>
+  </header>
+  <div class="profile-list" id="profile-list"></div>
+</div>
+
+<!-- The valley map -->
+<div class="screen" id="screen-map">
+  <header class="bar sticky">
+    <button class="icon-btn" onclick="App.play()" aria-label="Switch player">👥</button>
+    <div class="map-player" id="map-player"></div>
+    <span class="map-stars" id="map-stars"></span>
+    <button class="icon-btn" onclick="App.showHelp()" aria-label="How to play">❓</button>
+  </header>
+  <div class="tab-body">
+    <button class="btn big green wide" id="btn-continue"></button>
+    <button class="btn blue wide" id="btn-feast" onclick="App.startFeast()" style="display:none"></button>
+    <p class="nudge" id="feast-locked"></p>
+    <div id="world-list"></div>
+  </div>
+  <nav class="tabbar" aria-label="Valley">
+    <button class="tab on" onclick="App.showMap()" aria-label="Hunts">🌿<span>Hunts</span></button>
+    <button class="tab" onclick="App.showBook()" aria-label="Dino Book">📖<span>Book</span></button>
+    <button class="tab" onclick="App.showLeaderboard()" aria-label="Family leaderboard">🏆<span>Family</span></button>
+  </nav>
+</div>
+
+<!-- The Dino Book -->
+<div class="screen" id="screen-book">
+  <header class="bar sticky">
+    <h2>📖 Dino Book</h2>
+    <span class="map-stars" id="book-count"></span>
+  </header>
+  <div class="tab-body">
+    <p class="screen-hint">Everything you have met in the valley. Meet it once and it is yours — you do not have to eat it.</p>
+    <div class="book-list" id="book-list"></div>
+  </div>
+  <nav class="tabbar" aria-label="Valley">
+    <button class="tab" onclick="App.showMap()" aria-label="Hunts">🌿<span>Hunts</span></button>
+    <button class="tab on" onclick="App.showBook()" aria-label="Dino Book">📖<span>Book</span></button>
+    <button class="tab" onclick="App.showLeaderboard()" aria-label="Family leaderboard">🏆<span>Family</span></button>
+  </nav>
+</div>
+
+<!-- Leaderboard -->
+<div class="screen" id="screen-leaderboard">
+  <header class="bar sticky">
+    <h2>🏆 Family Leaderboard</h2>
+    <button class="btn-sound icon-btn">🔊</button>
+  </header>
+  <div class="tab-body">
+    <p class="screen-hint">Ranked by best score in the Endless Feast.</p>
+    <div class="lb-rows" id="lb-rows"></div>
+  </div>
+  <nav class="tabbar" aria-label="Valley">
+    <button class="tab" onclick="App.showMap()" aria-label="Hunts">🌿<span>Hunts</span></button>
+    <button class="tab" onclick="App.showBook()" aria-label="Dino Book">📖<span>Book</span></button>
+    <button class="tab on" onclick="App.showLeaderboard()" aria-label="Family leaderboard">🏆<span>Family</span></button>
+  </nav>
+</div>
+
+<!-- The hunt -->
+<div class="screen" id="screen-game">
+  <header class="bar gamebar">
+    <button class="icon-btn" onclick="App.pause()" aria-label="Pause">⏸</button>
+    <span class="hud hearts" id="hud-hearts"></span>
+    <span class="hud" id="hud-clock"></span>
+    <span class="hud score" id="hud-score">0</span>
+  </header>
+  <div class="belly-row">
+    <span class="hud stage" id="hud-stage"></span>
+    <span class="belly"><i id="belly-fill"></i></span>
+    <span class="hud goal" id="hud-goal"></span>
+  </div>
+  <div class="game-stage" id="stage">
+    <canvas id="cv"></canvas>
+  </div>
+</div>
+
+<!-- Results -->
+<div class="screen" id="screen-results">
+  <div class="res-inner">
+    <div class="res-emoji" id="res-emoji">🎉</div>
+    <h2 class="res-title" id="res-title"></h2>
+    <div class="res-stars" id="res-stars"></div>
+    <div class="res-score" id="res-score">0</div>
+    <div class="res-stats" id="res-stats"></div>
+    <p class="res-note" id="res-note"></p>
+    <p class="res-finished" id="res-finished" style="display:none">👑 Twenty hunts and Giganto himself! You are the biggest thing in the valley — now see how long you can last in the Endless Feast.</p>
+    <div class="res-actions">
+      <button class="btn ghost" onclick="App.showMap()">🌿 Valley</button>
+      <button class="btn" id="res-retry" style="display:none"></button>
+      <button class="btn green" id="res-next" style="display:none"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Before a hunt -->
+<div class="modal" id="modal-brief">
+  <div class="modal-box">
+    <h3 id="brief-title"></h3>
+    <div id="brief-body"></div>
+    <button class="btn green wide" id="btn-brief-go">🦖 Off we go!</button>
+    <button class="btn grey wide" onclick="GK.UI.closeModal('modal-brief')">Not yet</button>
+  </div>
+</div>
+
+<!-- Pause -->
+<div class="modal" id="modal-pause">
+  <div class="modal-box">
+    <h3>⏸ Paused</h3>
+    <button class="btn green wide" onclick="App.resume()">▶️ Keep hunting</button>
+    <button class="btn blue wide" onclick="App.showHelp()">❓ How to Play</button>
+    <div class="modal-actions"><button class="btn-sound icon-btn">🔊</button></div>
+    <button class="btn grey wide" onclick="App.quit()">🚪 Leave the hunt</button>
+  </div>
+</div>
+
+<!-- How to play -->
+<div class="modal" id="modal-help">
+  <div class="modal-box">
+    <h3>❓ How to Play</h3>
+    <p class="help-intro">You are a baby dinosaur. There is only one thing to work out, over and over: <b>is that smaller than me?</b></p>
+    <ul class="help-rules">
+      <li><span class="pip food"></span> <b>Smaller than you</b> — eat it! It fills your belly bar.</li>
+      <li><span class="pip same"></span> <b>The same size as you</b> — totally safe. You just bump noses.</li>
+      <li><span class="pip danger"></span> <b>Bigger than you</b> — keep away. It costs a heart if it catches you.</li>
+      <li><span class="pip spiky"></span> <b>Spiky ones</b> — never food, whatever size you are. Leave them alone.</li>
+    </ul>
+    <p class="help-note">Fill the belly bar and you <b>grow a size</b> — and everything you used to run from turns into dinner. <b>Berries and ferns</b> are always safe to eat, so there is always something.</p>
+    <p class="help-note">When something is close, the game tells you: a <b>red ring</b> means it can eat you, a <b>yellow glow</b> means you can eat it. Nothing in the valley can out-run you, and big hunters get bored after a few seconds.</p>
+    <p class="help-note"><b>Stars</b> come from your hearts — finish without being caught for all three. Take as long as you like.</p>
+    <button class="btn green wide" onclick="GK.UI.closeModal('modal-help')">Got it!</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<canvas id="confetti"></canvas>
+
+<!-- gamekit (vendored from rvenning/gamekit into lib/) -->
+<script src="lib/gk-util.js"></script>
+<script src="lib/gk-audio.js"></script>
+<script src="lib/gk-ui.js"></script>
+<script src="lib/gk-storage.js"></script>
+<script src="lib/gk-profiles.js"></script>
+<script src="lib/gk-pwa.js"></script>
+<script src="lib/gk-fx.js"></script>
+<script src="lib/gk-debug.js"></script>
+<script>
+  // Dust and leaf litter, not fireworks — small, earthy, quick to settle.
+  const Fx = GK.Fx.configure({
+    grav: 300, poolCap: 480, shakeMax: 12, shakeDecay: 28, shape: "circle",
+    burstSpeed: 150, burstSize: 2.5, textSize: 13, textDy: -30, textCap: 22,
+    font: "'Baloo 2',sans-serif",
+  });
+</script>
+<script src="js/firebase-config.js"></script>
+<!-- data registries -->
+<script src="js/rng.js"></script>
+<script src="js/creatures.js"></script>
+<script src="js/levels.js"></script>
+<!-- systems -->
+<script src="js/game.js"></script>
+<script src="js/storage.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/render.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

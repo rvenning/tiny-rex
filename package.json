@@ -1,0 +1,12 @@
+{
+  "name": "tiny-rex",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Eat anything smaller than you, run from anything bigger, and grow from a hatchling into a Mighty Rex.",
+  "scripts": {
+    "test": "node --test",
+    "report": "TR_REPORT=1 node --test tests/bot.test.js",
+    "diag": "node tests/diag.js",
+    "icons": "node tools/make-icons.js"
+  }
+}
