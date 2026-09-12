@@ -6,7 +6,7 @@
 // BUMP THE CACHE NAME whenever any shell file below changes, or devices keep
 // serving the copy they already have and the fix never lands.
 
-const CACHE = "tiny-rex-v1";
+const CACHE = "tiny-rex-v2";
 
 const SHELL = [
   "./",
@@ -29,6 +29,7 @@ const SHELL = [
   "js/game.js",
   "js/storage.js",
   "js/audio.js",
+  "js/art.js",
   "js/render.js",
   "js/main.js",
   "icons/icon-192.png",

@@ -122,7 +122,7 @@ const App = {
       }).join("");
       const first = levelsInWorld(wi)[0];
       const seen = first.idx <= unlocked;
-      return `<section class="world" style="--wc:${w.ground}">
+      return `<section class="world" style="--wc:${w.ground};--wc2:${w.rock}">
         <h3>${w.icon} ${seen ? GK.util.esc(w.name) : "???"}</h3>
         ${seen ? `<p class="world-blurb">${GK.util.esc(w.blurb)}</p>` : ""}
         <div class="hunt-grid">${cells}</div>
@@ -154,6 +154,7 @@ const App = {
     Render.resize();          // the game screen was display:none until just now
     Render.drained = 0;       // Game.start() empties the queue; stay in step
     Render.tick = 0;
+    Render.resetJuice();
     Fx.reset();
     Render.clearInput?.();
     Game.start(cfg);
@@ -205,12 +206,19 @@ const App = {
     const feast = res.mode === "feast";
     const l = feast ? null : LEVELS[res.levelIdx];
 
-    this.el("res-emoji").textContent = res.win ? (res.stars === 3 ? "🏆" : "🎉") : (feast ? "🌙" : "🥚");
+    // Rex herself, in the mood the run ended in. The results screen used to
+    // open on a platform emoji, which is the one place a small game most
+    // obviously stops being its own thing.
+    Render.resMood = res.win ? "happy" : feast ? "sleepy" : "sad";
+    Render.resTier = Math.max(1, Math.min(7, res.tier));
     this.el("res-title").textContent = feast
       ? "The sun went down"
       : res.win ? `${STAGE_NAME[res.tier]}!` : "Have another go";
-    this.el("res-stars").textContent = feast ? "" : "★".repeat(res.stars) + "☆".repeat(3 - res.stars);
-    this.el("res-score").textContent = res.score.toLocaleString();
+    // Three stars dropping in one after another, rather than three glyphs
+    // that are simply already there. Same information, and it lands.
+    this.el("res-stars").innerHTML = feast ? ""
+      : [0, 1, 2].map((i) => `<i style="animation-delay:${(i * 0.22).toFixed(2)}s">${i < res.stars ? "★" : "☆"}</i>`).join("");
+    this.countUp(this.el("res-score"), res.score, 620);
 
     this.el("res-stats").innerHTML = [
       `🍖 ate ${res.catches}`,
@@ -258,6 +266,19 @@ const App = {
       if (nextIdx >= LEVELS.length) this.later(() => Sfx.finish(), 1300);
     }
     this.showScreen("results");
+  },
+
+  // A score that arrives at its number is worth more than a score that was
+  // always sitting there. Skipped entirely under reduced motion.
+  countUp(el, to, ms) {
+    if (!Art.motion || to <= 0) { el.textContent = to.toLocaleString(); return; }
+    const t0 = performance.now();
+    const step = (t) => {
+      const k = Math.min(1, (t - t0) / ms);
+      el.textContent = Math.round(to * (1 - Math.pow(1 - k, 3))).toLocaleString();
+      if (k < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
   },
 
   /* ------------------------------ Dino Book ------------------------------ */

@@ -6,8 +6,9 @@
 // the frames where the game is over, because "the run ended" is itself an event
 // and a loop that only drains while running leaves the game screen up forever.
 //
-// Everything is drawn from the species table, so a new dinosaur is a row of
-// data and a shape name, not a new sprite.
+// What a thing LOOKS like lives in js/art.js. This file decides when and where,
+// keeps the little presentation-only timers that make an action feel like it
+// landed, and never touches a number the simulation reads.
 
 // How close something has to be before the game answers the question for you.
 // Across the valley you judge by size; inside this radius a red rim says "this
@@ -15,22 +16,42 @@
 // with CUE_RANGE in tests/brain.js, which models exactly this.
 const CUE_RANGE = 110;
 
-// The player's hide deepens as she grows, so her own size is legible even in
-// the corner of your eye.
-const SKIN = ["", "#8ad39a", "#79c78b", "#67b97c", "#57a96e", "#4a9a63", "#3f8b59", "#35794e"];
-const SKIN_TRIM = ["", "#d9f2dd", "#cdebd3", "#c0e4c9", "#b2dcbe", "#a6d4b4", "#9bccab", "#8fc3a1"];
+// Presentation-only timings. None of these are read by the simulation.
+const GROW_SHOW = 0.95;     // seconds of growth animation
+const BANNER_SHOW = 1.5;    // seconds the "Nipper!" ribbon stays up
+const HURT_SHOW = 0.55;
+const POP_SHOW = 0.3;       // the ghost of something you just ate
 
 const Render = {
   canvas: null, ctx: null, DPR: 1, scale: 1,
   viewLW: LW, viewLH: LH, offX: 0, offY: 0,
   active: false, _last: 0, _wasPaused: false, drained: 0,
   cssW: 0, cssH: 0,
-  world: null, tick: 0,
+  world: null, tick: 0, heroTick: 0,
+
+  // Juice state. All of it decays to nothing, and all of it is optional: with
+  // prefers-reduced-motion on, Art.motion is 0 and every one of these either
+  // holds still or is skipped.
+  pops: [], growT: 0, hurtT: 0, banner: null, bannerT: 0,
+  moving: 0, _px: 0, _py: 0, _dustAt: 0,
 
   /* ============================ boot / canvas ============================ */
   boot() {
     this.canvas = document.getElementById("cv");
     this.ctx = this.canvas.getContext("2d");
+
+    // Respect the system setting, and keep respecting it if it changes while
+    // the game is open. Art.motion is the single switch every drifting,
+    // swaying, pulsing thing in the game multiplies by.
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const applyMotion = () => {
+      Art.motion = mq.matches ? 0 : 1;
+      document.body.classList.toggle("reduced-motion", mq.matches);
+    };
+    applyMotion();
+    mq.addEventListener ? mq.addEventListener("change", applyMotion)
+      : mq.addListener && mq.addListener(applyMotion);
+
     this.resize();
     const re = () => this.resize();
     window.addEventListener("resize", re);
@@ -65,6 +86,19 @@ const Render = {
     this.viewLH = h / this.scale;
     this.offX = (this.viewLW - LW) / 2;
     this.offY = (this.viewLH - LH) / 2;
+  },
+
+  // What the baked art layers need to know to line up with this canvas.
+  geo() {
+    return {
+      pw: this.canvas.width, ph: this.canvas.height,
+      px: this.scale * this.DPR,
+      offX: this.offX, offY: this.offY,
+    };
+  },
+
+  box() {
+    return { L: -this.offX, T: -this.offY, R: LW + this.offX, B: LH + this.offY };
   },
 
   /* =============================== input ================================= */
@@ -140,6 +174,17 @@ const Render = {
   },
 
   /* ============================ events -> juice =========================== */
+  // Shake and flash go through here so that one place decides whether the
+  // screen is allowed to move at all.
+  shake(n) { Fx.addShake(n * Art.motion); },
+  flash(a, color) { Fx.addFlash(a * (0.4 + 0.6 * Art.motion), color); },
+
+  resetJuice() {
+    this.pops.length = 0;
+    this.growT = 0; this.hurtT = 0; this.banner = null; this.bannerT = 0;
+    this.moving = 0; this._dustAt = 0;
+  },
+
   drainEvents() {
     const q = Game.q;
     for (; this.drained < q.length; this.drained++) {
@@ -152,32 +197,54 @@ const Render = {
         case "eat": {
           const plant = isPlant(e.sp);
           plant ? Sfx.nibble() : Sfx.chomp(Game.player.tier, e.value >= 12);
+          // The thing you ate reacts: a ghost of it swells and fades, a ring
+          // goes out from where it stood, and then it is gone. Quick, readable,
+          // satisfying, gone — never left on screen to pile up.
+          this.pops.push({
+            x: e.x, y: e.y, sp: e.sp, r: speciesRadius(e.sp), t: 0,
+            big: !plant && e.value >= 12,
+          });
+          if (this.pops.length > 14) this.pops.shift();
           Fx.burst(e.x, e.y, e.sp.body, plant ? 6 : 12, plant ? 70 : 130, 0.45, plant ? 1.8 : 2.6);
+          Fx.sparkle(e.x, e.y, "#fff3c4", plant ? 2 : 4);
           if (!plant) Fx.text(e.x, e.y, `+${e.value}`, { color: "#ffe9a8" });
-          if (e.beast) { Sfx.roar(); Fx.addShake(9); Fx.confetti(LW, LH, ["#ffd45e", "#ff8a5c", "#7fd08a"], 40); }
+          if (e.beast) {
+            Sfx.roar(); this.shake(9);
+            Fx.confetti(LW, LH, ["#ffd45e", "#ff8a5c", "#7fd08a"], 40);
+            this.say(`${e.name || "Caught it"}!`);
+          }
           break;
         }
         case "grow":
           Sfx.grow(e.tier);
-          Fx.addShake(5);
-          Fx.addFlash(0.32, "#fff3c4");
+          this.growT = GROW_SHOW;
+          this.shake(5);
+          this.flash(0.3, "#fff3c4");
           Fx.burst(e.x, e.y, "#ffe9a8", 26, 190, 0.7, 3.2);
-          Fx.text(e.x, e.y - 18, STAGE_NAME[e.tier] + "!", { color: "#ffd45e", size: 15 });
-          GK.UI.toast(`🦖 ${STAGE_NAME[e.tier]}!`);
+          Fx.sparkle(e.x, e.y, "#fff7c0", 10);
+          this.say(`${STAGE_NAME[e.tier]}!`);
           break;
         case "hurt":
           Sfx.scare();
-          Fx.addShake(11);
-          Fx.addFlash(0.34, "#e0563f");
+          this.hurtT = HURT_SHOW;
+          this.shake(11);
+          this.flash(0.32, "#e0563f");
           Fx.burst(e.x, e.y, "#ffb4a1", 16, 150, 0.5, 2.6);
+          document.getElementById("hud-hearts").classList.add("lost");
+          setTimeout(() => document.getElementById("hud-hearts").classList.remove("lost"), 460);
+          break;
+        case "bump":
+          Sfx.bump();
+          Fx.dust(e.x, e.y + 3, 3, "rgba(255,250,230,0.5)");
           break;
         case "nope":
           Sfx.nope();
-          Fx.text(e.x, e.y - 12, "too spiky!", { color: "#cfd8e8", size: 11 });
+          Fx.dust(e.x, e.y + 4, 5, "rgba(216,224,240,0.75)");
+          Fx.text(e.x, e.y - 12, "too spiky!", { color: "#e6ecf8", size: 11 });
           break;
         case "shrink":
           Sfx.shrink();
-          Fx.addFlash(0.2, "#9fb0d0");
+          this.flash(0.18, "#9fb0d0");
           Fx.text(e.x, e.y - 20, "hungry…", { color: "#cfd8e8", size: 12 });
           break;
         case "wave":
@@ -190,12 +257,25 @@ const Render = {
     }
   },
 
+  // A ribbon across the top of the valley. The growth moment used to be a
+  // browser-chrome toast sliding in over the game; this is part of the picture,
+  // which is the whole point of the difference.
+  say(text) { this.banner = text; this.bannerT = BANNER_SHOW; },
+
   /* ============================== the loop =============================== */
   loop(t) {
     requestAnimationFrame((tt) => this.loop(tt));
     const real = Math.min(0.05, (t - this._last) / 1000 || 0);
     this._last = t;
-    if (!this.active) return;
+
+    if (!this.active) {
+      // The splash keeps a little Rex idling in her clearing, and the results
+      // screen shows her in the mood the run ended in — so the first and last
+      // thing anyone sees is the game's own art rather than a platform emoji.
+      if (GK.UI.screen === "splash") { this.heroTick += real; this.paintHero(); }
+      else if (GK.UI.screen === "results") { this.heroTick += real; this.paintResArt(); }
+      return;
+    }
 
     // A stage resizes with no resize event when the web font lands or the HUD
     // row rewraps — notice the drift rather than hunting every cause. Check BOTH
@@ -212,14 +292,39 @@ const Render = {
       this.tick += real;
       Game.update(real);
       Fx.update(real);
+      this.juice(real);
       this.drainEvents();
-      this.render(real);
+      this.render();
       this.hud();
     } else {
       // Still drain: quitting and losing both emit from outside update(), and a
       // loop that only drains while running leaves the game screen up forever.
       this.drainEvents();
-      this.render(0);
+      this.render();
+    }
+  },
+
+  // Presentation timers, and the only thing here that reads the simulation:
+  // how fast she is actually travelling, which decides where she looks and
+  // whether her feet kick up dust.
+  juice(dt) {
+    if (this.growT > 0) this.growT = Math.max(0, this.growT - dt);
+    if (this.hurtT > 0) this.hurtT = Math.max(0, this.hurtT - dt);
+    if (this.bannerT > 0) this.bannerT = Math.max(0, this.bannerT - dt);
+    for (let i = this.pops.length - 1; i >= 0; i--) {
+      this.pops[i].t += dt;
+      if (this.pops[i].t >= POP_SHOW) this.pops.splice(i, 1);
+    }
+
+    const p = Game.player;
+    if (!p) return;
+    const d = Math.hypot(p.x - this._px, p.y - this._py) / Math.max(0.0001, dt);
+    this._px = p.x; this._py = p.y;
+    this.moving = GK.util.clamp(d / Math.max(1, p.speed * 0.55), 0, 1);
+    if (Art.motion && this.moving > 0.55 && this.tick > this._dustAt) {
+      this._dustAt = this.tick + 0.11;
+      Fx.dust(p.x - p.vxSign * p.r * 0.4, p.y + p.r * 0.78, 2,
+        "rgba(240,232,208,0.55)");
     }
   },
 
@@ -228,15 +333,16 @@ const Render = {
     const ctx = this.ctx;
     if (!ctx || !Game.player) return;
     const w = this.world || WORLDS[0];
+    const A = Art.art(w);
     const s = this.scale * this.DPR;
     ctx.setTransform(s, 0, 0, s, 0, 0);
     ctx.translate(this.offX, this.offY);
+    const box = this.box();
 
-    const L = -this.offX, T = -this.offY;
-    const R = LW + this.offX, B = LH + this.offY;
-
-    this.drawSurround(ctx, w, L, T, R, B);
-    this.drawGround(ctx, w);
+    // The valley itself: baked once, blitted here.
+    Art.ensure(w, this.geo());
+    Art.drawScene(ctx, box);
+    Art.drawClouds(ctx, this.tick, box);
 
     const [shx, shy] = Fx.shakeOffset();
     ctx.save();
@@ -251,62 +357,26 @@ const Render = {
       this.drawEnt(ctx, e, p);
     }
     if (!drewPlayer) this.drawPlayer(ctx, p);
+    this.drawPops(ctx);
 
     Fx.render(ctx);
     ctx.restore();
 
+    // Foliage over the rim and the corners falling away: the frame around the
+    // picture, drawn after everything alive so there is something in front of
+    // the player as well as behind her.
+    Art.drawOverlay(ctx, box);
+    Art.drawMotes(ctx, A, this.tick, box);
+    this.drawBanner(ctx);
+
+    if (this.hurtT > 0) this.drawHurtRim(ctx, box);
+
     if (Fx.flash > 0) {
       ctx.globalAlpha = Math.min(1, Fx.flash);
       ctx.fillStyle = Fx.flashColor;
-      ctx.fillRect(L, T, R - L, B - T);
+      ctx.fillRect(box.L, box.T, box.R - box.L, box.B - box.T);
       ctx.globalAlpha = 1;
     }
-  },
-
-  // Beyond the arena walls: more valley. The play field rarely matches a phone,
-  // and a rectangle floating in a void reads as a bug rather than a boundary.
-  drawSurround(ctx, w, L, T, R, B) {
-    ctx.fillStyle = w.scrub;
-    ctx.fillRect(L, T, R - L, B - T);
-    ctx.fillStyle = "rgba(0,0,0,0.18)";
-    for (let i = 0; i < 90; i++) {
-      const hx = L + GK.util.hash2(i, 3) * (R - L);
-      const hy = T + GK.util.hash2(i, 9) * (B - T);
-      if (hx > -6 && hx < LW + 6 && hy > -6 && hy < LH + 6) continue;
-      const r = 3 + Math.floor(GK.util.hash2(i, 5) * 997) % 5;
-      ctx.beginPath(); ctx.arc(hx, hy, r, 0, 6.28); ctx.fill();
-    }
-  },
-
-  drawGround(ctx, w) {
-    const g = ctx.createLinearGradient(0, 0, 0, LH);
-    g.addColorStop(0, w.sky[1]);
-    g.addColorStop(1, w.ground);
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, LW, LH);
-
-    // Scattered scenery, stable because it comes from a positional hash.
-    ctx.fillStyle = "rgba(0,0,0,0.06)";
-    for (let i = 0; i < 46; i++) {
-      const hx = GK.util.hash2(i, 11) * LW;
-      const hy = GK.util.hash2(i, 17) * LH;
-      const r = 5 + Math.floor(GK.util.hash2(i, 23) * 997) % 14;
-      ctx.beginPath(); ctx.ellipse(hx, hy, r, r * 0.5, 0, 0, 6.28); ctx.fill();
-    }
-    ctx.fillStyle = w.rock;
-    ctx.globalAlpha = 0.5;
-    for (let i = 0; i < 14; i++) {
-      const hx = GK.util.hash2(i, 31) * LW;
-      const hy = GK.util.hash2(i, 37) * LH;
-      const r = 6 + Math.floor(GK.util.hash2(i, 41) * 997) % 10;
-      ctx.beginPath(); ctx.ellipse(hx, hy, r, r * 0.62, 0.4, 0, 6.28); ctx.fill();
-    }
-    ctx.globalAlpha = 1;
-
-    // The valley wall.
-    ctx.strokeStyle = "rgba(0,0,0,0.28)";
-    ctx.lineWidth = 3;
-    ctx.strokeRect(1.5, 1.5, LW - 3, LH - 3);
   },
 
   /* ------------------------------ creatures ------------------------------ */
@@ -318,257 +388,193 @@ const Render = {
     // whole size mechanic: she reads size across the valley and is never
     // punished for a judgement the picture could not settle.
     if (d < CUE_RANGE && e.kind !== "plant") {
-      const near = 1 - d / CUE_RANGE;
-      const pulse = 0.55 + 0.45 * Math.sin(this.tick * 6);
-      ctx.lineWidth = 2.4;
-      if (rel === "danger") {
-        ctx.strokeStyle = `rgba(226,74,58,${(0.35 + 0.5 * near) * pulse})`;
-        ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 6, 0, 6.28); ctx.stroke();
-      } else if (rel === "food") {
-        ctx.strokeStyle = `rgba(255,225,130,${0.3 + 0.45 * near})`;
-        ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 5, 0, 6.28); ctx.stroke();
-      } else if (rel === "spiky") {
-        ctx.strokeStyle = `rgba(190,200,220,${0.28 + 0.35 * near})`;
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath(); ctx.arc(e.x, e.y, e.r + 6, 0, 6.28); ctx.stroke();
-        ctx.setLineDash([]);
-      }
+      Art.cue(ctx, e.x, e.y, e.r, rel, 1 - d / CUE_RANGE, this.tick);
     }
 
     ctx.save();
     ctx.translate(e.x, e.y);
     if (e.beast) ctx.scale(1.1, 1.1);
-    this.paint(ctx, e.sp, e.r, e.face || 1, e.step || 0);
+    // Just been bumped or bitten: a quick recoil. The engine already tracks
+    // the cooldown, so the target reacting costs no new state at all.
+    if (e.nope > 0) {
+      const k = e.nope / 0.9;
+      const s = 1 + k * k * 0.13 * Art.motion;
+      ctx.scale(s, 2 - s);
+    }
+    // Plants have no step of their own, so they get the breeze instead: the
+    // engine already hands every one of them a phase it was not using.
+    const step = e.kind === "plant"
+      ? (e.sway || 0) + this.tick * 1.1
+      : (e.step || 0);
+    Art.paintSpecies(ctx, e.sp, e.r, e.face || 1, step, false, this.tick);
     ctx.restore();
 
-    if (e.beast && e.name) {
-      ctx.fillStyle = "rgba(255,255,255,0.92)";
-      ctx.font = "700 11px 'Baloo 2', sans-serif";
-      ctx.textAlign = "center";
-      ctx.strokeStyle = "rgba(0,0,0,0.55)"; ctx.lineWidth = 3;
-      ctx.strokeText(e.name, e.x, e.y - e.r - 10);
-      ctx.fillText(e.name, e.x, e.y - e.r - 10);
-      ctx.textAlign = "left";
-    }
+    if (e.beast && e.name) this.drawNameplate(ctx, e.name, e.x, e.y - e.r - 13);
+  },
+
+  // A named beast gets a plate rather than outlined text floating in the air.
+  drawNameplate(ctx, name, x, y) {
+    ctx.font = "800 11px 'Baloo 2', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const w = ctx.measureText(name).width + 14;
+    Art.rr(ctx, x - w / 2, y - 8, w, 16, 8);
+    ctx.fillStyle = "rgba(32,20,12,0.72)";
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,196,77,0.6)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = "#ffdb92";
+    ctx.fillText(name, x, y);
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
   },
 
   drawPlayer(ctx, p) {
     ctx.save();
     ctx.translate(p.x, p.y);
-    // Just been caught: flicker, so the grace period is visible rather than
-    // something she has to remember.
-    if (p.invuln > 0 && Math.floor(this.tick * 12) % 2 === 0) ctx.globalAlpha = 0.45;
-    const sp = {
-      shape: "rex", body: SKIN[p.tier], trim: SKIN_TRIM[p.tier],
-      spiky: false, kind: "creature",
-    };
-    this.paint(ctx, sp, p.r, p.vxSign, this.tick * 6, p.chomp > 0);
+    Art.paintPlayer(ctx, {
+      r: p.r, tier: p.tier, face: p.vxSign, step: this.tick * 6, t: this.tick,
+      chomp: GK.util.clamp(p.chomp / 0.22, 0, 1),
+      grow: this.growT / GROW_SHOW,
+      invuln: p.invuln, moving: this.moving,
+    });
+    // Just been caught: a ring of grace rather than a strobe. The flicker the
+    // first version used is a horrible thing to put in a small child's game,
+    // and it also hid her at the exact moment she needed to see where she was.
+    if (p.invuln > 0) Art.guardRing(ctx, p.r, p.invuln);
+    // Growing: a shockwave out from her feet, and a bloom of warm light around
+    // her. The ring on its own read as a debug circle.
+    if (this.growT > 0) {
+      const k = 1 - this.growT / GROW_SHOW;
+      ctx.globalAlpha = (1 - k) * (1 - k);
+      Art.softBlob(ctx, 0, 0, p.r * (1.6 + k * 2), p.r * (1.6 + k * 2), "rgba(255,232,158,0.6)");
+      ctx.globalAlpha = (1 - k) * 0.75;
+      ctx.strokeStyle = "#fff3c4";
+      ctx.lineWidth = 5 * (1 - k) + 0.6;
+      ctx.beginPath(); ctx.arc(0, 0, p.r * (1 + k * 3.4), 0, 6.28); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
     ctx.restore();
   },
 
-  // One painter for every dinosaur in the game. `r` is the radius the engine
-  // uses for collisions, so what you can see and what you can touch cannot
-  // drift apart.
-  paint(ctx, sp, r, face, step, chomping) {
-    ctx.scale(face < 0 ? -1 : 1, 1);
-    const bob = Math.sin(step) * r * 0.06;
-    ctx.translate(0, bob);
-    const body = sp.body, trim = sp.trim;
-
-    const ell = (x, y, rx, ry, fill, rot = 0) => {
-      ctx.fillStyle = fill;
-      ctx.beginPath(); ctx.ellipse(x, y, rx, ry, rot, 0, 6.28); ctx.fill();
-    };
-    const leg = (x, len, phase) => {
-      ctx.strokeStyle = body; ctx.lineWidth = Math.max(1.6, r * 0.17);
-      ctx.lineCap = "round";
+  // The ghost of something just eaten, swelling and fading. Drawn with the same
+  // painter as the living animal, so the thing that vanishes is recognisably
+  // the thing that was there.
+  drawPops(ctx) {
+    for (const o of this.pops) {
+      const k = o.t / POP_SHOW;
+      ctx.save();
+      ctx.globalAlpha = (1 - k) * 0.7;
+      ctx.translate(o.x, o.y);
+      ctx.scale(1 + k * 0.6, 1 + k * 0.6);
+      Art.paintSpecies(ctx, o.sp, o.r, 1, 0, false, 0);
+      ctx.restore();
+      ctx.globalAlpha = 1 - k;
+      ctx.strokeStyle = o.big ? "#ffd45e" : "#fff3c4";
+      ctx.lineWidth = 2.4 * (1 - k) + 0.4;
       ctx.beginPath();
-      ctx.moveTo(x, r * 0.25);
-      ctx.lineTo(x + Math.sin(step * 2 + phase) * r * 0.22, len);
+      ctx.arc(o.x, o.y, o.r * (1 + k * 2.2), 0, 6.28);
       ctx.stroke();
-    };
-    const eye = (x, y) => {
-      ell(x, y, Math.max(1, r * 0.1), Math.max(1, r * 0.1), "#1d2430");
-      ell(x + r * 0.04, y - r * 0.04, Math.max(0.5, r * 0.04), Math.max(0.5, r * 0.04), "#fff");
-    };
-
-    switch (sp.shape) {
-      case "fern": {
-        ctx.strokeStyle = body; ctx.lineWidth = Math.max(1.4, r * 0.2); ctx.lineCap = "round";
-        for (let i = -2; i <= 2; i++) {
-          ctx.beginPath();
-          ctx.moveTo(0, r * 0.8);
-          ctx.quadraticCurveTo(i * r * 0.35, 0, i * r * 0.8, -r * 0.75);
-          ctx.stroke();
-        }
-        ell(0, r * 0.85, r * 0.5, r * 0.22, trim);
-        break;
-      }
-      case "bush": {
-        ell(-r * 0.4, r * 0.1, r * 0.6, r * 0.55, body);
-        ell(r * 0.4, r * 0.15, r * 0.55, r * 0.5, body);
-        ell(0, -r * 0.3, r * 0.65, r * 0.6, body);
-        for (let i = 0; i < 4; i++) {
-          const a = i * 1.7;
-          ell(Math.cos(a) * r * 0.5, Math.sin(a) * r * 0.45, r * 0.16, r * 0.16, trim);
-        }
-        break;
-      }
-      case "bug": {
-        ell(-r * 0.15, 0, r * 0.9, r * 0.62, body);
-        ell(r * 0.65, -r * 0.05, r * 0.35, r * 0.32, trim);
-        ctx.strokeStyle = "rgba(0,0,0,0.3)"; ctx.lineWidth = Math.max(1, r * 0.12);
-        for (let i = -1; i <= 1; i++) {
-          ctx.beginPath();
-          ctx.moveTo(i * r * 0.3, r * 0.3);
-          ctx.lineTo(i * r * 0.5, r * 0.85);
-          ctx.stroke();
-        }
-        eye(r * 0.75, -r * 0.12);
-        break;
-      }
-      case "flyer": {
-        const flap = Math.sin(step * 3) * 0.5;
-        ctx.fillStyle = trim;
-        for (const s of [-1, 1]) {
-          ctx.beginPath();
-          ctx.moveTo(0, -r * 0.1);
-          ctx.quadraticCurveTo(r * 0.5, s * r * (0.9 + flap), r * 1.15, s * r * 0.25);
-          ctx.quadraticCurveTo(r * 0.4, s * r * 0.2, 0, -r * 0.1);
-          ctx.fill();
-        }
-        ell(0, 0, r * 0.75, r * 0.3, body);
-        ell(r * 0.75, -r * 0.12, r * 0.32, r * 0.26, body);
-        eye(r * 0.85, -r * 0.16);
-        break;
-      }
-      case "quad": case "club": case "plated": case "frilled": {
-        // Tail
-        ctx.strokeStyle = body; ctx.lineWidth = r * 0.34; ctx.lineCap = "round";
-        ctx.beginPath();
-        ctx.moveTo(-r * 0.5, -r * 0.05);
-        ctx.quadraticCurveTo(-r * 1.05, r * 0.1 + Math.sin(step * 2) * r * 0.14, -r * 1.25, -r * 0.2);
-        ctx.stroke();
-        leg(-r * 0.5, r * 0.85, 0); leg(r * 0.35, r * 0.85, 1.9);
-        ell(0, -r * 0.05, r * 0.86, r * 0.5, body);
-        if (sp.shape === "plated") {
-          ctx.fillStyle = trim;
-          for (let i = -2; i <= 2; i++) {
-            ctx.beginPath();
-            ctx.moveTo(i * r * 0.3 - r * 0.14, -r * 0.42);
-            ctx.lineTo(i * r * 0.3, -r * 0.95);
-            ctx.lineTo(i * r * 0.3 + r * 0.14, -r * 0.42);
-            ctx.fill();
-          }
-          ctx.strokeStyle = trim; ctx.lineWidth = r * 0.1;
-          for (const s of [-1, 1]) {
-            ctx.beginPath();
-            ctx.moveTo(-r * 1.1, -r * 0.16);
-            ctx.lineTo(-r * 1.4, -r * 0.16 + s * r * 0.36);
-            ctx.stroke();
-          }
-        } else if (sp.shape === "club") {
-          ell(-r * 1.32, -r * 0.2, r * 0.28, r * 0.26, trim);
-          ctx.fillStyle = trim;
-          for (let i = -2; i <= 1; i++) ell(i * r * 0.34, -r * 0.44, r * 0.14, r * 0.1, trim);
-        } else if (sp.shape === "frilled") {
-          ctx.fillStyle = trim;
-          ctx.beginPath();
-          ctx.ellipse(r * 0.55, -r * 0.3, r * 0.42, r * 0.52, -0.2, 0, 6.28);
-          ctx.fill();
-        } else if (sp.spiky) {
-          ctx.fillStyle = trim;
-          for (let i = -2; i <= 2; i++) {
-            ctx.beginPath();
-            ctx.moveTo(i * r * 0.3 - r * 0.1, -r * 0.4);
-            ctx.lineTo(i * r * 0.3, -r * 1.0);
-            ctx.lineTo(i * r * 0.3 + r * 0.1, -r * 0.4);
-            ctx.fill();
-          }
-        }
-        ell(r * 0.82, -r * 0.16, r * 0.36, r * 0.3, body);
-        if (sp.shape === "frilled") {
-          ctx.strokeStyle = trim; ctx.lineWidth = r * 0.11;
-          ctx.beginPath(); ctx.moveTo(r * 0.95, -r * 0.34); ctx.lineTo(r * 1.35, -r * 0.62); ctx.stroke();
-          ctx.beginPath(); ctx.moveTo(r * 0.95, -r * 0.1); ctx.lineTo(r * 1.32, -r * 0.3); ctx.stroke();
-        }
-        eye(r * 0.94, -r * 0.24);
-        break;
-      }
-      default: {
-        // Every biped — compy, oviraptor, raptor, gallimimus, dilophosaurus and
-        // the player's own rex — is the same drawing at different weights.
-        const heavy = sp.shape === "rex";
-        const tailLen = heavy ? 1.3 : 1.15;
-        ctx.strokeStyle = body; ctx.lineWidth = r * (heavy ? 0.34 : 0.24); ctx.lineCap = "round";
-        ctx.beginPath();
-        ctx.moveTo(-r * 0.4, -r * 0.05);
-        ctx.quadraticCurveTo(-r * 0.95, r * 0.22 + Math.sin(step * 2) * r * 0.16, -r * tailLen, -r * 0.3);
-        ctx.stroke();
-        leg(-r * 0.12, r * 0.92, 0);
-        leg(r * 0.2, r * 0.92, 2.1);
-        ell(0, -r * 0.08, r * (heavy ? 0.8 : 0.66), r * (heavy ? 0.56 : 0.46), body);
-        ctx.fillStyle = trim;
-        ctx.beginPath();
-        ctx.ellipse(-r * 0.05, r * 0.14, r * 0.5, r * 0.24, 0, 0, 6.28);
-        ctx.fill();
-        // Neck and head
-        ctx.strokeStyle = body; ctx.lineWidth = r * (heavy ? 0.4 : 0.26);
-        ctx.beginPath();
-        ctx.moveTo(r * 0.3, -r * 0.2);
-        ctx.lineTo(r * 0.6, -r * (heavy ? 0.5 : 0.62));
-        ctx.stroke();
-        const hx = r * (heavy ? 0.82 : 0.72), hy = -r * (heavy ? 0.58 : 0.72);
-        ell(hx, hy, r * (heavy ? 0.44 : 0.3), r * (heavy ? 0.32 : 0.24), body);
-        // The jaw, which opens on a bite.
-        const gape = chomping ? r * 0.26 : r * 0.06;
-        ctx.fillStyle = "#5a2430";
-        ctx.beginPath();
-        ctx.moveTo(hx + r * 0.06, hy + r * 0.04);
-        ctx.lineTo(hx + r * (heavy ? 0.5 : 0.34), hy - r * 0.02);
-        ctx.lineTo(hx + r * (heavy ? 0.48 : 0.32), hy + gape);
-        ctx.fill();
-        if (heavy && r > 16) {
-          ctx.fillStyle = "#fff";
-          for (let i = 0; i < 3; i++) {
-            ell(hx + r * (0.18 + i * 0.12), hy + r * 0.06, r * 0.045, r * 0.075, "#fff");
-          }
-        }
-        if (sp.shape === "crested") {
-          ctx.fillStyle = trim;
-          for (const s of [-1, 1]) {
-            ctx.beginPath();
-            ctx.ellipse(hx - r * 0.02, hy - r * 0.3 + s * r * 0.05, r * 0.26, r * 0.16, -0.35, 0, 6.28);
-            ctx.fill();
-          }
-        }
-        if (heavy) {
-          // Tiny arms. Non-negotiable.
-          ctx.strokeStyle = body; ctx.lineWidth = r * 0.11;
-          ctx.beginPath();
-          ctx.moveTo(r * 0.34, -r * 0.02);
-          ctx.lineTo(r * 0.5, r * 0.14);
-          ctx.stroke();
-        }
-        eye(hx + r * 0.12, hy - r * (heavy ? 0.1 : 0.06));
-        break;
-      }
+      ctx.globalAlpha = 1;
     }
+  },
+
+  // "Something important just happened" — a gold ribbon that pops in, holds,
+  // and slides away.
+  drawBanner(ctx) {
+    if (!this.banner || this.bannerT <= 0) return;
+    const k = 1 - this.bannerT / BANNER_SHOW;
+    const inK = Math.min(1, k / 0.14);
+    const outK = k > 0.82 ? (k - 0.82) / 0.18 : 0;
+    const pop = Art.motion ? 0.7 + 0.3 * inK + Math.sin(inK * Math.PI) * 0.12 : 1;
+    const y = LH * 0.2 - outK * 22;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, inK) * (1 - outK);
+    ctx.translate(LW / 2, y);
+    ctx.scale(pop, pop);
+    ctx.font = "800 21px 'Baloo 2', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const w = Math.max(120, ctx.measureText(this.banner).width + 46);
+    const g = ctx.createLinearGradient(0, -18, 0, 18);
+    g.addColorStop(0, "#ffd870");
+    g.addColorStop(1, "#e8a12c");
+    Art.rr(ctx, -w / 2, -18, w, 36, 18);
+    ctx.fillStyle = "rgba(40,25,12,0.4)";
+    ctx.fill();
+    Art.rr(ctx, -w / 2 + 2, -16, w - 4, 32, 16);
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.5)";
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    ctx.fillStyle = "#40260c";
+    ctx.fillText(this.banner, 0, 1);
+    ctx.restore();
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+  },
+
+  // Caught: the edges of the valley go red for half a second. Easier to read
+  // than a whole-screen wash, and it does not hide what is chasing her.
+  drawHurtRim(ctx, box) {
+    const k = this.hurtT / HURT_SHOW;
+    ctx.globalAlpha = k * 0.55;
+    for (let i = 0; i < 4; i++) {
+      ctx.strokeStyle = "rgba(226,80,63," + (0.45 - i * 0.09).toFixed(2) + ")";
+      ctx.lineWidth = 16 - i * 3;
+      Art.rr(ctx, box.L + 3 + i * 5, box.T + 3 + i * 5,
+        (box.R - box.L) - 6 - i * 10, (box.B - box.T) - 6 - i * 10, 18);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
   },
 
   /* --------------------------------- HUD --------------------------------- */
   hud() {
     const p = Game.player;
     const el = (id) => document.getElementById(id);
-    el("hud-hearts").textContent = "❤️".repeat(Math.max(0, Game.hearts)) +
-      "🖤".repeat(Math.max(0, 3 - Game.hearts));
-    el("hud-stage").textContent = `🦖 ${STAGE_NAME[p.tier]}`;
-    el("belly-fill").style.width = `${Math.round(Game.bellyFrac() * 100)}%`;
-    el("hud-score").textContent = Game.score.toLocaleString();
+
+    const hearts = el("hud-hearts");
+    if (hearts.dataset.n !== String(Game.hearts)) {
+      hearts.dataset.n = String(Game.hearts);
+      let html = "";
+      for (let i = 0; i < 3; i++) {
+        html += `<svg class="hp${i < Game.hearts ? "" : " gone"}" viewBox="0 0 24 22" aria-hidden="true"><use href="#ico-heart"/></svg>`;
+      }
+      hearts.innerHTML = html;
+      hearts.setAttribute("aria-label", `${Math.max(0, Game.hearts)} hearts left`);
+    }
+
+    const stage = el("hud-stage");
+    const name = STAGE_NAME[p.tier];
+    if (stage.dataset.v !== name) {
+      stage.dataset.v = name;
+      stage.textContent = name;
+      stage.classList.remove("pop");
+      void stage.offsetWidth;                   // restart the animation
+      stage.classList.add("pop");
+    }
+
+    const belly = el("belly-fill");
+    const frac = Game.bellyFrac();
+    belly.style.width = `${Math.round(frac * 100)}%`;
+    belly.parentElement.classList.toggle("full", frac > 0.82);
+
+    const score = el("hud-score");
+    const sv = Game.score.toLocaleString();
+    if (score.dataset.v !== sv) {
+      score.dataset.v = sv;
+      score.textContent = sv;
+      score.classList.remove("pop");
+      void score.offsetWidth;
+      score.classList.add("pop");
+    }
 
     const goal = el("hud-goal");
     if (Game.mode === "feast") {
-      goal.textContent = `🌋 wave ${Game.wave + 1}  ·  ${Math.floor(Game.T)}s`;
+      goal.textContent = `wave ${Game.wave + 1} · ${Math.floor(Game.T)}s`;
     } else if (p.tier < Game.level.target) {
       goal.textContent = `grow to ${STAGE_NAME[Game.level.target]}`;
     } else if (Game.level.beast && !Game.beastEaten) {
@@ -582,11 +588,12 @@ const Render = {
     else {
       clock.style.display = "";
       const t = Math.ceil(Game.timeLeft);
-      clock.textContent = `⏳ ${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
+      clock.textContent = `${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`;
       clock.classList.toggle("low", t <= 20);
     }
   },
 
+  /* ------------------------------- odd jobs ------------------------------ */
   // The Dino Book paints its cards with the same function the valley does, so a
   // creature can never look like one thing on the card and another in the game.
   paintCard(canvas, id) {
@@ -600,8 +607,112 @@ const Render = {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
     ctx.save();
-    ctx.translate(w / 2, h / 2 + h * 0.06);
-    this.paint(ctx, sp, Math.min(w, h) * 0.34, 1, 0.6);
+    ctx.translate(w / 2, h / 2 + h * 0.04);
+    Art.paintSpecies(ctx, sp, Math.min(w, h) * 0.32, 1, 0.6, false, 0);
+    ctx.restore();
+  },
+
+  // How the run ended, on Rex's own face. Happy bounces with her mouth open,
+  // sad sits still with her brow down, sleepy shuts her eyes — the same three
+  // moods the old trophy / egg / moon emoji stood for, in the game's own hand.
+  resMood: "happy", resTier: 3,
+
+  paintResArt() {
+    const cv = document.getElementById("res-art");
+    if (!cv) return;
+    const w = cv.clientWidth, h = cv.clientHeight;
+    if (w < 40 || h < 30) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    if (cv.width !== Math.round(w * dpr)) {
+      cv.width = Math.round(w * dpr);
+      cv.height = Math.round(h * dpr);
+    }
+    const ctx = cv.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    const t = this.heroTick;
+    const happy = this.resMood === "happy";
+    const r = Math.min(h * 0.34, w * 0.26);
+    // A hop on the happy ending, and nothing on the others.
+    const hop = happy && Art.motion ? Math.abs(Math.sin(t * 2.6)) * r * 0.42 : 0;
+
+    Art.softBlob(ctx, w / 2, h * 0.52, r * 2.6, r * 2,
+      happy ? "rgba(255,214,120,0.3)" : "rgba(255,255,255,0.08)");
+    if (happy && Art.motion) {
+      // Three sparks turning about her, rather than a particle system running
+      // on a screen nobody is playing.
+      for (let i = 0; i < 3; i++) {
+        const a = t * 1.7 + i * 2.094;
+        const s = 2 + Math.sin(t * 4 + i) * 1.1;
+        ctx.fillStyle = "rgba(255,240,180,0.9)";
+        ctx.beginPath();
+        ctx.arc(w / 2 + Math.cos(a) * r * 1.9, h * 0.52 + Math.sin(a) * r * 0.9, s, 0, 6.28);
+        ctx.fill();
+      }
+    }
+    ctx.save();
+    ctx.translate(w / 2, h * 0.66 - hop);
+    Art.paintPlayer(ctx, {
+      r, tier: this.resTier, face: 1, step: happy ? t * 5 : t * 0.7, t,
+      chomp: happy ? 0.55 + Math.sin(t * 2.6) * 0.3 : 0,
+      grow: 0, invuln: 0, moving: 0,
+      sad: this.resMood === "sad", sleepy: this.resMood === "sleepy",
+    });
+    ctx.restore();
+  },
+
+  // The splash's little clearing. Same painter, same palette, same character —
+  // the title screen is the game's first promise about what it looks like, and
+  // three emoji in a row was not it.
+  paintHero() {
+    const cv = document.getElementById("hero");
+    if (!cv) return;
+    const w = cv.clientWidth, h = cv.clientHeight;
+    if (w < 40 || h < 30) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    if (cv.width !== Math.round(w * dpr)) {
+      cv.width = Math.round(w * dpr);
+      cv.height = Math.round(h * dpr);
+    }
+    const ctx = cv.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    const t = this.heroTick;
+    const A = Art.art(WORLDS[0]);
+    const gy = h * 0.82;
+
+    // A mound of sunlit ground, and the light above it.
+    Art.softBlob(ctx, w / 2, gy - h * 0.28, w * 0.42, h * 0.42, A.sun);
+    ctx.save();
+    ctx.beginPath();
+    ctx.ellipse(w / 2, gy + h * 0.3, w * 0.42, h * 0.36, 0, 0, 6.28);
+    ctx.clip();
+    const g = ctx.createLinearGradient(0, gy - h * 0.1, 0, h);
+    g.addColorStop(0, A.floor[0]);
+    g.addColorStop(1, A.floor[1]);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+    for (let i = 0; i < 7; i++) {
+      const hx = w * (0.16 + GK.util.hash2(i, 11) * 0.68);
+      DECOR.tuft(ctx, hx, gy + h * 0.06 + GK.util.hash2(i, 17) * h * 0.1,
+        1 + GK.util.hash2(i, 23) * 0.5, (k) => GK.util.hash2(i + k, 31), A);
+    }
+    ctx.restore();
+
+    // A fern either side, swaying, and Rex in the middle of it.
+    const r = Math.min(h * 0.3, w * 0.16);
+    for (const s of [-1, 1]) {
+      ctx.save();
+      ctx.translate(w / 2 + s * r * 2.4, gy);
+      Art.paintSpecies(ctx, species("fern"), r * 0.62, s, t * 0.9 + (s > 0 ? 1.6 : 0), false, t);
+      ctx.restore();
+    }
+    ctx.save();
+    ctx.translate(w / 2, gy - r * 0.72);
+    Art.paintPlayer(ctx, {
+      r, tier: 4, face: 1, step: t * 1.6, t,
+      chomp: 0, grow: 0, invuln: 0, moving: 0,
+    });
     ctx.restore();
   },
 };

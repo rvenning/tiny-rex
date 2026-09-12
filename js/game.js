@@ -307,11 +307,17 @@ const Game = {
           const push = (touch - d) + 0.6;
           e.x = GK.util.clamp(e.x + (dx / d) * push, e.r, LW - e.r);
           e.y = GK.util.clamp(e.y + (dy / d) * push, e.r, LH - e.r);
+          if (e.nope > 0) continue;
+          e.nope = 0.9;             // doubles as the cooldown on the feedback
           if (rel === "spiky") {
-            if (e.nope > 0) continue;
-            e.nope = 0.9;
             p.belly = Math.max(0, p.belly - SPIKE_COST);
             this.emit({ type: "nope", x: e.x, y: e.y, sp: e.sp });
+          } else {
+            // Bumping noses with something your own size is this game keeping
+            // its central promise: nothing happens. But nothing happening has
+            // to FEEL deliberate rather than like a missed collision, so it
+            // emits too. Presentation only — no rule, score or belly moves.
+            this.emit({ type: "bump", x: e.x, y: e.y, sp: e.sp });
           }
         }
       }

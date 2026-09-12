@@ -41,6 +41,33 @@ is fine, being stuck is not.
   a fact. Meeting one is enough; you do not have to eat it.
 - Family profiles with PINs, cross-device sync, offline play, installable.
 
+## How it looks
+
+`js/art.js` owns the whole look: the four valleys' palettes, the scenery that
+litters them, the foreground planting, and every creature in the game. Two
+rules keep it out of the simulation's way:
+
+- **Nothing in there may move a creature or change a number the engine reads.**
+  Positions come from `js/game.js`; scenery comes from a positional hash, so
+  the valley looks hand-placed and still plays the identical level on every
+  device.
+- **The static parts are painted once and blitted.** Each world bakes two
+  offscreen layers — the valley and ground behind everything, the planting and
+  vignette in front of it — rebuilt only when the world changes or the canvas
+  resizes. That is what pays for several hundred pieces of scenery costing two
+  `drawImage` calls a frame.
+
+Every animal shares one edge treatment (a dark rim and a top highlight) and one
+ground shadow, which is most of what makes eighteen procedurally drawn
+dinosaurs look like one illustrator did them. Rex gets her own painter rather
+than borrowing the generic biped: she is jade with a cream belly because no
+green reads against grass, sand, stone AND ash, and she stands in a small pool
+of light so a four-year-old can always find herself. A stripe on her back and a
+spike on her crest appear with each size she reaches.
+
+Anything that drifts, sways, breathes or pulses multiplies by `Art.motion`,
+which is 0 under `prefers-reduced-motion`. The CSS honours the same query.
+
 ## Built on gamekit
 
 Profiles, storage + family sync, sounds, screens, effects and PWA install all

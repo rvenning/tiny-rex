@@ -1,9 +1,15 @@
 /* Tiny Rex — game styles on top of lib/gk-base.css.
    The kit's primitives (.btn, .screen, .bar, .modal, .toast, profile roster)
-   are re-themed through the --gk-* custom properties rather than forked. */
+   are re-themed through the --gk-* custom properties rather than forked.
+
+   Everything below is built from the token block at the top: colour, space,
+   radius, shadow, motion and type. A one-off pixel value in a rule further down
+   is a bug in this file, not a decision — the whole point of the tokens is that
+   two panels on two different screens cannot drift apart. */
 
 :root {
-  /* gk-base's own button colours carry WHITE lettering and measure 2.4:1 and
+  /* ---- gamekit overrides -----------------------------------------------
+     gk-base's own button colours carry WHITE lettering and measure 2.4:1 and
      3.0:1 against it. These are the measured-safe replacements, picked for the
      SMALLEST button on the page — the 15px ones need 4.5:1, not 3:1. */
   --gk-green: #1a8253;  --gk-green-sh: #106b42;
@@ -13,16 +19,60 @@
   --gk-accent:#ffc44d;  --gk-accent-sh:#c08c1c;
   --gk-ink:   #1c1510;
 
-  --tr-night: #241a12;
-  --tr-ink:   #1c1510;
-  --tr-gold:  #ffc44d;
-  --tr-leaf:  #7fd08a;
-  --tr-sun:   #ff9a5c;
-  --tr-bone:  #f2e6d0;
-  --tr-danger:#e2503f;
+  /* ---- colour ---------------------------------------------------------- */
+  --tr-night:  #241a12;      /* the app's ground colour */
+  --tr-deep:   #1a120c;      /* under the tab bar, behind the HUD */
+  --tr-bark:   #33251a;
+  --tr-ink:    #1c1510;      /* text on light surfaces */
+  --tr-bone:   #f4e9d5;      /* text on dark surfaces */
+  --tr-bone-2: rgba(244,233,213,.74);
+  --tr-bone-3: rgba(244,233,213,.52);
+  --tr-gold:   #ffc44d;
+  --tr-gold-hi:#ffdb92;      /* small text on a gold wash — measured, not eyeballed */
+  --tr-gold-lo:#d99a2e;
+  --tr-leaf:   #7fd08a;
+  --tr-sun:    #ff9a5c;
+  --tr-danger: #e2503f;
+  --tr-heart:  #ff5d78;
+
+  /* ---- surfaces -------------------------------------------------------- */
+  --tr-s1:   rgba(255,255,255,.065);
+  --tr-s2:   rgba(255,255,255,.11);
+  --tr-s3:   rgba(255,255,255,.17);
+  --tr-line: rgba(255,255,255,.10);
+  --tr-card: #fdf6e6;
+
+  /* ---- space ----------------------------------------------------------- */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 22px; --sp-6: 30px;
+
+  /* ---- radius ---------------------------------------------------------- */
+  --r-1: 9px; --r-2: 13px; --r-3: 17px; --r-4: 22px; --r-pill: 999px;
+
+  /* ---- depth ----------------------------------------------------------- */
+  --sh-1: 0 2px 7px rgba(0,0,0,.26);
+  --sh-2: 0 7px 20px rgba(0,0,0,.32);
+  --sh-3: 0 18px 44px rgba(0,0,0,.5);
+  --sh-in: inset 0 1px 0 rgba(255,255,255,.09);
+
+  /* ---- motion ---------------------------------------------------------- */
+  --t-fast: 110ms; --t-mid: 210ms; --t-slow: 420ms;
+  --ease:     cubic-bezier(.22,.68,.36,1);
+  --ease-pop: cubic-bezier(.34,1.5,.64,1);
+
+  /* ---- type ------------------------------------------------------------ */
+  --fs-hero: clamp(42px, 13vw, 72px);
+  --fs-title: 26px;
+  --fs-h2: 21px;
+  --fs-h3: 19px;
+  --fs-body: 14px;
+  --fs-small: 12.5px;
+  --fs-tiny: 11.5px;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
+
+/* The icon sheet in index.html must take up no room. */
+.sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
 
 /* Paint the ROOT, not just body: with viewport-fit=cover iOS extends the visual
    viewport past height:100% in standalone, and a body-only background leaves a
@@ -36,11 +86,12 @@ body {
   height: 100%;
   overflow: hidden;
   font-family: 'Baloo 2', 'Comic Sans MS', system-ui, sans-serif;
+  font-size: var(--fs-body);
   color: var(--tr-bone);
   background:
     radial-gradient(ellipse at 18% -8%, #4a3320 0%, transparent 58%),
     radial-gradient(ellipse at 86% 104%, #1f3a26 0%, transparent 60%),
-    linear-gradient(180deg, #33251a 0%, #241a12 74%);
+    linear-gradient(180deg, var(--tr-bark) 0%, var(--tr-night) 74%);
   background-color: var(--tr-night);   /* AFTER the shorthand, or it is a no-op */
   -webkit-user-select: none; user-select: none;
   -webkit-tap-highlight-color: transparent;
@@ -55,30 +106,65 @@ body {
    into and collapses to zero HEIGHT instead. Traded one bug for the other here
    once already. */
 .screen { align-items: stretch; justify-content: flex-start; background: transparent; }
-h2 { font-size: 21px; }
-h3 { font-size: 19px; }
 
-/* gk-base's plain .btn is WHITE on --gk-accent, and this accent is a bright
-   gold. Give it the dark ink and keep white only on the darkened fills. */
-.btn { color: var(--tr-ink); }
+/* ------------------------------ typography -------------------------------- */
+h1, h2, h3 { line-height: 1.15; }
+h2 { font-size: var(--fs-h2); }
+h3 { font-size: var(--fs-h3); }
+
+/* ------------------------------- buttons ---------------------------------- */
+/* One button system, five states. gk-base supplies the fill and the 3D lip;
+   everything that makes it feel touchable is here. */
+.btn {
+  color: var(--tr-ink);
+  font-weight: 800;
+  letter-spacing: .2px;
+  transition: transform var(--t-fast) var(--ease),
+              box-shadow var(--t-fast) var(--ease),
+              filter var(--t-fast) var(--ease);
+}
 .btn.green, .btn.blue, .btn.grey, .btn.danger { color: #fff; }
-.btn.big { font-size: 21px; padding: 17px 30px; min-width: 250px; }
+.btn.big { font-size: var(--fs-h2); padding: 17px var(--sp-6); min-width: 250px; }
 .btn.wide { width: 100%; }
 .btn.ghost {
-  background: rgba(255,255,255,.14); color: var(--tr-bone);
+  background: var(--tr-s3); color: var(--tr-bone);
   box-shadow: 0 4px 0 rgba(0,0,0,.34);
 }
-.btn.ghost:active { box-shadow: none; }
-.btn .sub { display: block; font-size: 12.5px; font-weight: 600; opacity: .85; }
+.btn.ghost:active:not(:disabled) { box-shadow: 0 1px 0 rgba(0,0,0,.34); }
+.btn .sub { display: block; font-size: var(--fs-small); font-weight: 600; opacity: .85; }
 
-.icon-btn {
-  width: 40px; height: 38px; border: 0; border-radius: 12px; font-size: 17px;
-  background: rgba(255,255,255,.13); color: var(--tr-bone); cursor: pointer;
-  flex: 0 0 auto;
+/* Hover only where there is a real pointer — a phone that emulates it leaves
+   the button stuck in its hover state after a tap. */
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.07); }
+  .icon-btn:hover:not(:disabled) { background: var(--tr-s3); }
+  .hunt:hover:not(.locked) { background: var(--tr-s3); transform: translateY(-2px); }
+  .dino:hover { background: var(--tr-s2); }
 }
+.btn:active:not(:disabled) { transform: translateY(4px); box-shadow: 0 2px 0 rgba(0,0,0,.32); }
+.btn:disabled { filter: grayscale(.55) brightness(.82); box-shadow: 0 3px 0 rgba(0,0,0,.26); }
+
+/* Keyboard focus, everywhere, in the game's own gold. */
+.btn:focus-visible, .icon-btn:focus-visible, .tab:focus-visible,
+.hunt:focus-visible, .avatar-choice:focus-visible, .profile-card:focus-visible {
+  outline: 3px solid var(--tr-gold);
+  outline-offset: 3px;
+}
+
+/* 44px, because the hands using this are four and seven years old. */
+.icon-btn {
+  width: 44px; height: 44px; border: 0; border-radius: var(--r-2); font-size: 18px;
+  background: var(--tr-s2); color: var(--tr-bone); cursor: pointer;
+  flex: 0 0 auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
+}
+.icon-btn:active { transform: scale(.93); }
+
+/* -------------------------------- chrome ---------------------------------- */
 .bar {
-  display: flex; align-items: center; gap: 9px; width: 100%;
-  padding: calc(8px + env(safe-area-inset-top)) 11px 8px;
+  display: flex; align-items: center; gap: var(--sp-2); width: 100%;
+  padding: calc(var(--sp-2) + env(safe-area-inset-top)) var(--sp-3) var(--sp-2);
 }
 .bar h2 { flex: 1; }
 /* A bar of controls on a scrolling screen has to stay reachable. */
@@ -88,109 +174,185 @@ h3 { font-size: 19px; }
 }
 .tab-body {
   flex: 1 1 auto; width: 100%; max-width: 560px; margin: 0 auto;
-  padding: 4px 14px calc(78px + env(safe-area-inset-bottom));
+  padding: var(--sp-1) var(--sp-4) calc(82px + env(safe-area-inset-bottom));
   overflow-y: auto;
 }
-.screen-hint { font-size: 13.5px; opacity: .8; margin: 4px 0 12px; }
-.nudge { font-size: 13px; opacity: .78; text-align: center; margin: 8px 0 12px; }
+.screen-hint { font-size: 13.5px; color: var(--tr-bone-2); margin: var(--sp-1) 0 var(--sp-3); }
+.nudge { font-size: 13px; color: var(--tr-bone-2); text-align: center; margin: var(--sp-2) 0 var(--sp-3); }
 
 /* gk-base styles .sheet, NOT .modal-box — a game that forgets to write one gets
    dark ink floating on the 50% black scrim at about 1.2:1. */
 .modal-box {
-  background: #fdf6e6; color: #2a2016;
+  background: var(--tr-card); color: #2a2016;
   width: min(92vw, 400px); max-height: 86vh; overflow-y: auto;
-  padding: 20px; border-radius: 20px;
-  box-shadow: 0 18px 44px rgba(0,0,0,.5);
+  padding: var(--sp-5); border-radius: var(--r-4);
+  box-shadow: var(--sh-3);
+  animation: sheetIn var(--t-mid) var(--ease-pop) both;
 }
-.modal-box h3 { margin-bottom: 10px; }
-.modal-box .btn { margin: 8px 0 0; }
-.modal-actions { display: flex; justify-content: center; margin: 10px 0 2px; }
-.modal-actions .icon-btn { background: rgba(0,0,0,.1); color: #2a2016; }
+@keyframes sheetIn {
+  from { opacity: 0; transform: translateY(14px) scale(.96); }
+  to   { opacity: 1; transform: none; }
+}
+.modal-box h3 { margin-bottom: var(--sp-2); }
+.modal-box .btn { margin: var(--sp-2) 0 0; }
+.modal-actions { display: flex; justify-content: center; margin: var(--sp-2) 0 2px; }
+.modal-actions .icon-btn { background: rgba(0,0,0,.08); color: #2a2016; }
 
 /* The profile modal borrows these from the kit. */
-.avatar-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 7px; margin: 10px 0; }
+.avatar-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 7px; margin: var(--sp-2) 0; }
 .avatar-choice {
-  aspect-ratio: 1; border: 0; border-radius: 12px; font-size: 22px; cursor: pointer;
+  aspect-ratio: 1; border: 0; border-radius: var(--r-2); font-size: 22px; cursor: pointer;
   background: rgba(0,0,0,.08); color: inherit;
+  transition: transform var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
 }
-.avatar-choice.selected { background: var(--tr-gold); box-shadow: 0 0 0 3px #c08c1c inset; }
+.avatar-choice:active { transform: scale(.92); }
+.avatar-choice.selected { background: var(--tr-gold); box-shadow: 0 0 0 3px var(--gk-accent-sh) inset; }
 
-/* -------------------------------- splash --------------------------------- */
+/* -------------------------------- splash ---------------------------------- */
 .splash-inner {
   min-height: 100%; width: 100%; display: flex; flex-direction: column;
-  align-items: center; justify-content: center; gap: 6px;
-  padding: 24px; text-align: center;
+  align-items: center; justify-content: center; gap: var(--sp-1);
+  padding: var(--sp-5); text-align: center;
 }
-.splash-egg { font-size: 30px; letter-spacing: 12px; animation: bob 3.2s ease-in-out infinite; }
-@keyframes bob { 0%,100% { transform: translateY(0) } 50% { transform: translateY(-8px) } }
+/* The title screen's own little clearing, painted by Render.paintHero with the
+   same brush as the valley. */
+.hero-wrap {
+  width: min(300px, 72vw); height: min(150px, 26vh);
+  margin-bottom: calc(-1 * var(--sp-2));
+}
+#hero { width: 100%; height: 100%; display: block; }
 .logo {
-  font-size: clamp(42px, 13vw, 72px); line-height: .95; font-weight: 800;
+  font-size: var(--fs-hero); line-height: .95; font-weight: 800;
   color: var(--tr-gold);
   text-shadow: 0 4px 0 #96661a, 0 8px 0 rgba(0,0,0,.42);
-  margin: 6px 0 2px; letter-spacing: 1px;
+  margin: var(--sp-1) 0 2px; letter-spacing: 1px;
 }
 .logo span { display: block; color: var(--tr-leaf); text-shadow: 0 4px 0 #2e7a43, 0 8px 0 rgba(0,0,0,.42); }
-.tagline { font-size: 16px; opacity: .93; margin-bottom: 14px; max-width: 320px; }
-.keys-hint { font-size: 12.5px; opacity: .55; margin-top: 10px; display: none; }
+.tagline { font-size: 16px; color: var(--tr-bone); margin-bottom: var(--sp-3); max-width: 320px; }
+.keys-hint { font-size: var(--fs-small); color: var(--tr-bone-3); margin-top: var(--sp-2); display: none; }
 @media (pointer: fine) { .keys-hint { display: block; } }
-.splash-foot { margin-top: 16px; display: flex; align-items: center; gap: 14px; opacity: .9; font-size: 13.5px; }
+.splash-foot {
+  margin-top: var(--sp-4); display: flex; align-items: center; gap: var(--sp-4);
+  color: var(--tr-bone-2); font-size: 13.5px;
+}
 
 /* --------------------------------- map ----------------------------------- */
 .map-player { flex: 1; font-size: 16.5px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .map-stars { font-weight: 800; font-size: 15px; color: var(--tr-gold); white-space: nowrap; }
-#btn-continue { margin: 8px 0 6px; }
+#btn-continue { margin: var(--sp-2) 0 var(--sp-2); }
 
-.world { margin: 18px 0 6px; }
-.world h3 { color: var(--tr-gold); margin-bottom: 2px; }
-.world-blurb { font-size: 13px; opacity: .78; margin-bottom: 9px; }
-.hunt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
-.hunt {
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
-  padding: 10px 6px; border: 0; border-radius: 14px; cursor: pointer;
-  background: rgba(255,255,255,.1); color: var(--tr-bone);
-  border-left: 4px solid var(--wc, var(--tr-leaf));
+/* A world is a card with its own colour in the lip, so the four valleys are
+   told apart on the map as well as in the game. */
+.world {
+  position: relative; overflow: hidden;
+  margin: var(--sp-4) 0;
+  padding: var(--sp-4) var(--sp-3) var(--sp-3);
+  border-radius: var(--r-4);
+  border: 1px solid var(--tr-line);
+  background: var(--tr-s1);
+  box-shadow: var(--sh-1);
 }
-.hunt.next { background: rgba(255,196,77,.22); box-shadow: 0 0 0 2px var(--tr-gold) inset; }
-.hunt.locked { opacity: .38; cursor: default; }
+.world::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(120% 90% at 0% 0%, var(--wc, #5f9e57) 0%, transparent 62%);
+  opacity: .16;
+}
+.world > * { position: relative; }
+.world::before {
+  content: ""; position: absolute; inset: 0 0 auto; height: 4px;
+  background: linear-gradient(90deg, var(--wc, var(--tr-leaf)), var(--wc2, transparent) 72%, transparent);
+}
+.world h3 { color: var(--tr-gold-hi); margin-bottom: 2px; }
+.world-blurb { font-size: 13px; color: var(--tr-bone-2); margin-bottom: var(--sp-2); line-height: 1.35; }
+.hunt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: var(--sp-2); }
+.hunt {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  min-height: 74px;
+  padding: var(--sp-2) var(--sp-1); border: 1px solid var(--tr-line); border-radius: var(--r-3);
+  border-left: 4px solid var(--wc, var(--tr-leaf));
+  cursor: pointer;
+  background: var(--tr-s2); color: var(--tr-bone);
+  font-family: inherit;
+  transition: transform var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+}
+.hunt:active:not(.locked) { transform: scale(.95); }
+.hunt.next {
+  background: rgba(255,196,77,.2);
+  box-shadow: 0 0 0 2px var(--tr-gold) inset;
+  animation: nextBreathe 2.6s ease-in-out infinite;
+}
+@keyframes nextBreathe {
+  0%, 100% { box-shadow: 0 0 0 2px var(--tr-gold) inset, 0 0 0 0 rgba(255,196,77,.34); }
+  50%      { box-shadow: 0 0 0 2px var(--tr-gold) inset, 0 0 0 7px rgba(255,196,77,0); }
+}
+.hunt.locked { opacity: .36; cursor: default; }
 /* A lighter gold than --tr-gold. The "next" card sits on a translucent gold
    wash, which lifts the ground under the label and drops plain --tr-gold to
    4.45:1 — just under the 4.5 small-text bar. Measured, not eyeballed. */
-.hunt-n { font-weight: 800; font-size: 17px; color: #ffdb92; }
+.hunt-n { font-weight: 800; font-size: 17px; color: var(--tr-gold-hi); }
 .hunt-name { font-size: 12px; text-align: center; line-height: 1.15; }
-.hunt-stars { font-size: 12px; color: #ffdb92; letter-spacing: 1px; }
+.hunt-stars { font-size: 12px; color: var(--tr-gold-hi); letter-spacing: 1px; }
 
 /* ------------------------------- Dino Book -------------------------------- */
-.book-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 9px; }
+.book-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); gap: var(--sp-2); }
 .dino {
-  display: flex; gap: 8px; align-items: flex-start;
-  background: rgba(255,255,255,.09); border-radius: 14px; padding: 9px;
+  display: flex; gap: var(--sp-2); align-items: flex-start;
+  background: var(--tr-s1); border: 1px solid var(--tr-line);
+  border-radius: var(--r-3); padding: var(--sp-2);
+  transition: background var(--t-fast) var(--ease);
 }
-.dino.unknown { opacity: .42; }
-.dino-art { width: 52px; height: 46px; flex: 0 0 auto; }
-.dino.unknown .dino-art { background: rgba(255,255,255,.08); border-radius: 10px; }
+.dino.unknown { opacity: .45; }
+.dino-art {
+  width: 54px; height: 48px; flex: 0 0 auto; border-radius: var(--r-2);
+  background: linear-gradient(180deg, rgba(255,255,255,.07), rgba(0,0,0,.14));
+  box-shadow: var(--sh-in);
+}
 .dino-info { min-width: 0; }
-.dino-name { font-weight: 800; font-size: 13.5px; color: var(--tr-gold); line-height: 1.2; }
-.dino-size { font-size: 11px; opacity: .8; }
-.dino-fact { font-size: 11.5px; opacity: .9; margin-top: 4px; line-height: 1.35; }
+.dino-name { font-weight: 800; font-size: 13.5px; color: var(--tr-gold-hi); line-height: 1.2; }
+.dino-size { font-size: var(--fs-tiny); color: var(--tr-bone-2); }
+.dino-fact { font-size: var(--fs-tiny); color: var(--tr-bone-2); margin-top: var(--sp-1); line-height: 1.4; }
 
-/* ------------------------------ leaderboard ------------------------------- */
+/* --------------------------- roster + leaderboard -------------------------- */
+/* Both are lists sitting on the dark valley, and gk-base gives them white
+   cards — the one place the app stopped looking like itself. The light SHEETS
+   (name, PIN) stay light on purpose: those match .modal-box. */
+.profile-card, .lb-row {
+  background: var(--tr-s1); color: var(--tr-bone);
+  border: 1px solid var(--tr-line);
+  border-radius: var(--r-4);
+  box-shadow: var(--sh-1);
+  transition: transform var(--t-fast) var(--ease), background var(--t-fast) var(--ease);
+}
+.profile-card { padding: var(--sp-3) var(--sp-4); }
+.profile-card:active { transform: scale(.985); }
+.profile-card .pmeta { color: var(--tr-bone-2); opacity: 1; }
+.profile-card .ppin, .profile-card .pdelete { color: var(--tr-bone-2); }
+.profile-card.add .pname { color: var(--tr-gold-hi); }
+.lb-row { border-radius: var(--r-3); }
+.lb-row.me { outline: 3px solid var(--tr-gold); outline-offset: 1px; }
+.lb-rank { color: var(--tr-gold-hi); }
+@media (hover: hover) and (pointer: fine) {
+  .profile-card:hover { background: var(--tr-s2); }
+}
 .lb-rows { display: flex; flex-direction: column; gap: 7px; }
-.lb-stat { font-size: 13px; margin-left: 9px; white-space: nowrap; }
+.lb-stat { font-size: 13px; margin-left: var(--sp-2); white-space: nowrap; }
 
 /* -------------------------------- tab bar --------------------------------- */
 .tabbar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 6;
   display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
   background: rgba(23,17,11,.96);
-  padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
-  border-top: 1px solid rgba(255,255,255,.09);
+  padding: var(--sp-1) var(--sp-2) calc(var(--sp-1) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--tr-line);
 }
 .tab {
   display: flex; flex-direction: column; align-items: center; gap: 1px;
-  background: none; border: 0; cursor: pointer; padding: 5px 2px;
-  font-size: 19px; color: rgba(242,230,208,.62); font-family: inherit;
+  background: none; border: 0; cursor: pointer; padding: var(--sp-2) 2px;
+  font-size: 19px; color: var(--tr-bone-3); font-family: inherit;
+  transition: color var(--t-fast) var(--ease), transform var(--t-fast) var(--ease);
 }
-.tab span { font-size: 11px; font-weight: 700; }
+.tab:active { transform: scale(.94); }
+.tab span { font-size: var(--fs-tiny); font-weight: 700; }
 .tab.on { color: var(--tr-gold); }
 
 /* ------------------------------ game screen ------------------------------- */
@@ -198,31 +360,84 @@ h3 { font-size: 19px; }
    .screen.active{display:flex}, and an ID selector outranks both — setting it
    pins this screen visible forever, on top of everything else. */
 #screen-game { overflow: hidden; touch-action: none; }
-.gamebar { background: rgba(23,17,11,.9); z-index: 5; flex: 0 0 auto; }
-.hud { font-weight: 800; font-size: 14px; white-space: nowrap; }
-.hud.hearts { flex: 1; font-size: 15px; letter-spacing: 1px; }
-.hud.score { color: var(--tr-gold); }
-.hud.low { color: var(--tr-danger); }
-.hud.stage { font-size: 13px; color: var(--tr-leaf); }
-.hud.goal { font-size: 12px; opacity: .82; }
+.gamebar {
+  background: linear-gradient(180deg, rgba(20,14,9,.94), rgba(20,14,9,.86));
+  z-index: 5; flex: 0 0 auto;
+  padding-bottom: var(--sp-1);
+}
+.gamebar, .belly-row { width: 100%; max-width: 620px; margin-inline: auto; }
+.hud {
+  display: inline-block;
+  font-weight: 800; font-size: var(--fs-body); white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.hud.pill {
+  padding: 5px 12px; border-radius: var(--r-pill);
+  background: var(--tr-s2); box-shadow: var(--sh-in);
+}
+.hud.hearts { flex: 1; display: flex; align-items: center; gap: 3px; }
+.hud.score { color: var(--tr-gold); min-width: 62px; text-align: right; }
+.hud.clock { color: var(--tr-bone); }
+.hud.clock.low { color: #fff; background: rgba(226,80,63,.34); animation: clockTick 1s steps(2) infinite; }
+@keyframes clockTick { 0%, 100% { opacity: 1; } 50% { opacity: .6; } }
+.hud.pop { animation: numPop 280ms var(--ease-pop); }
+@keyframes numPop {
+  0% { transform: scale(1); } 40% { transform: scale(1.2); } 100% { transform: scale(1); }
+}
+
+/* Hearts are drawn here rather than borrowed from the platform's emoji font:
+   the black heart used for a spent one looked like a smudge on iOS and like a
+   spade on Android, and neither of them could be animated. */
+.hp {
+  width: 20px; height: 19px; flex: 0 0 auto;
+  fill: var(--tr-heart);
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,.45));
+  transition: fill var(--t-mid) var(--ease), transform var(--t-mid) var(--ease-pop);
+}
+.hp.gone { fill: rgba(255,255,255,.18); transform: scale(.82); filter: none; }
+.hearts.lost { animation: heartsKnock 420ms var(--ease); }
+@keyframes heartsKnock {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); } 55% { transform: translateX(3px); } 80% { transform: translateX(-2px); }
+}
 
 .belly-row {
-  display: flex; align-items: center; gap: 8px; flex: 0 0 auto;
-  padding: 0 11px 6px; background: rgba(23,17,11,.9); z-index: 5;
+  display: flex; align-items: center; gap: var(--sp-2); flex: 0 0 auto;
+  padding: 0 var(--sp-3) var(--sp-2);
+  background: linear-gradient(180deg, rgba(20,14,9,.86), rgba(20,14,9,.7));
+  z-index: 5;
 }
+.hud.stage {
+  font-size: var(--fs-small); color: var(--tr-leaf);
+  background: rgba(127,208,138,.15); padding: 3px 10px; border-radius: var(--r-pill);
+}
+.hud.stage.pop { animation: chipPop 460ms var(--ease-pop); }
+@keyframes chipPop {
+  0% { transform: scale(.84); } 45% { transform: scale(1.12); } 100% { transform: scale(1); }
+}
+.hud.goal { font-size: var(--fs-tiny); color: var(--tr-bone-2); font-weight: 700; }
 .belly {
-  position: relative; flex: 1; min-width: 40px; height: 13px;
-  background: rgba(255,255,255,.14); border-radius: 7px; overflow: hidden;
+  position: relative; flex: 1; min-width: 40px; height: 15px;
+  background: rgba(0,0,0,.34); border-radius: var(--r-pill); overflow: hidden;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,.4);
 }
 .belly i {
   position: absolute; inset: 0 auto 0 0; width: 0;
-  background: linear-gradient(90deg, #d99a2e, var(--tr-gold));
-  border-radius: 7px; transition: width .16s linear;
+  background: linear-gradient(180deg, var(--tr-gold-hi), var(--tr-gold) 45%, var(--tr-gold-lo));
+  border-radius: var(--r-pill);
+  transition: width 160ms linear;
+  box-shadow: 0 0 8px rgba(255,196,77,.35);
+}
+/* Nearly full: the bar tells you a size is coming before the number does. */
+.belly.full i { animation: bellyGlow 900ms ease-in-out infinite; }
+@keyframes bellyGlow {
+  0%, 100% { box-shadow: 0 0 8px rgba(255,196,77,.4); }
+  50%      { box-shadow: 0 0 15px rgba(255,224,140,.85); }
 }
 
 .game-stage {
   position: relative; flex: 1 1 auto; width: 100%; min-height: 0;
-  overflow: hidden; touch-action: none; background: var(--tr-night);
+  overflow: hidden; touch-action: none; background: var(--tr-deep);
 }
 /* The canvas is a replaced element: without an explicit CSS size it renders at
    its ATTRIBUTE size (logical x DPR) and overflows every retina screen. */
@@ -232,28 +447,106 @@ h3 { font-size: 19px; }
 .res-inner {
   min-height: 100%; width: 100%; max-width: 460px; margin: 0 auto;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 6px; padding: 24px; text-align: center;
+  gap: var(--sp-1); padding: var(--sp-5); text-align: center;
 }
-.res-emoji { font-size: 56px; animation: bob 2.4s ease-in-out infinite; }
-.res-title { font-size: 26px; color: var(--tr-gold); }
-.res-stars { font-size: 30px; color: var(--tr-gold); letter-spacing: 4px; }
-.res-score { font-size: 44px; font-weight: 800; color: var(--tr-gold); line-height: 1; }
-.res-stats { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; font-size: 14px; opacity: .92; margin: 6px 0; }
-.res-note { font-size: 14px; opacity: .88; max-width: 340px; line-height: 1.4; }
-.res-finished { font-size: 14px; color: var(--tr-gold); max-width: 340px; margin-top: 8px; line-height: 1.4; }
-.res-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 14px; }
+.res-art { width: min(210px, 54vw); height: min(140px, 21vh); }
+#res-art { width: 100%; height: 100%; display: block; }
+.res-title { font-size: var(--fs-title); color: var(--tr-gold); }
+.res-stars { font-size: 30px; color: var(--tr-gold); letter-spacing: 4px; min-height: 38px; }
+.res-stars i { display: inline-block; font-style: normal; animation: starDrop 520ms var(--ease-pop) both; }
+@keyframes starDrop {
+  0%   { opacity: 0; transform: translateY(-16px) scale(.4) rotate(-25deg); }
+  70%  { opacity: 1; transform: translateY(0) scale(1.22) rotate(4deg); }
+  100% { opacity: 1; transform: none; }
+}
+.res-score { font-size: 44px; font-weight: 800; color: var(--tr-gold); line-height: 1; font-variant-numeric: tabular-nums; }
+.res-stats {
+  display: flex; gap: var(--sp-2); flex-wrap: wrap; justify-content: center;
+  font-size: 13px; margin: var(--sp-2) 0;
+}
+.res-stats div {
+  background: var(--tr-s1); border: 1px solid var(--tr-line);
+  border-radius: var(--r-pill); padding: 5px 12px; font-weight: 700;
+}
+.res-note { font-size: var(--fs-body); color: var(--tr-bone-2); max-width: 340px; line-height: 1.45; }
+.res-finished { font-size: var(--fs-body); color: var(--tr-gold); max-width: 340px; margin-top: var(--sp-2); line-height: 1.45; }
+.res-actions {
+  display: flex; flex-direction: column; align-items: stretch; gap: var(--sp-2);
+  width: 100%; max-width: 300px; margin-top: var(--sp-4);
+}
+.res-actions .btn { width: 100%; margin: 0; }
+#res-next { order: 1; }
+#res-retry { order: 2; }
+.res-actions .btn.ghost { order: 3; }
 
 /* ------------------------------ help / brief ------------------------------ */
-.help-intro { font-size: 14.5px; margin-bottom: 10px; }
-.help-rules { list-style: none; margin: 0 0 12px; }
-.help-rules li { font-size: 13.5px; line-height: 1.45; margin-bottom: 8px; display: flex; gap: 8px; align-items: baseline; }
-.pip { width: 13px; height: 13px; border-radius: 50%; flex: 0 0 auto; display: inline-block; }
-.pip.food { background: #d99a2e; }
+.help-intro { font-size: 14.5px; margin-bottom: var(--sp-2); }
+.help-rules { list-style: none; margin: 0 0 var(--sp-3); }
+.help-rules li {
+  font-size: 13.5px; line-height: 1.45; margin-bottom: var(--sp-2);
+  display: flex; gap: var(--sp-2); align-items: baseline;
+}
+.help-rules li > span:last-child { flex: 1; }
+.pip { width: 14px; height: 14px; border-radius: 50%; flex: 0 0 auto; display: inline-block; }
+.pip.food { background: #d99a2e; box-shadow: 0 0 0 3px rgba(217,154,46,.24); }
 .pip.same { background: #7a8aa0; }
-.pip.danger { background: #c0362a; }
-.pip.spiky { background: #56606f; box-shadow: 0 0 0 2px #fdf6e6 inset, 0 0 0 3px #56606f; }
-.help-note { font-size: 13px; line-height: 1.45; margin-bottom: 9px; }
-.brief-goal { font-size: 15px; margin-bottom: 8px; }
-.brief-hint { font-size: 13.5px; line-height: 1.45; background: rgba(0,0,0,.06); padding: 9px 11px; border-radius: 12px; }
+.pip.danger { background: #c0362a; box-shadow: 0 0 0 3px rgba(192,54,42,.24); }
+.pip.spiky { background: #56606f; box-shadow: 0 0 0 2px var(--tr-card) inset, 0 0 0 3px #56606f; }
+.help-note { font-size: 13px; line-height: 1.5; margin-bottom: var(--sp-2); }
+.brief-goal { font-size: 15px; margin-bottom: var(--sp-2); }
+.brief-hint {
+  font-size: 13.5px; line-height: 1.45; background: rgba(0,0,0,.06);
+  padding: var(--sp-2) var(--sp-3); border-radius: var(--r-2);
+  border-left: 3px solid var(--gk-accent-sh);
+}
+
+/* gk-base pins the toast 24px from the bottom with no width and no entrance.
+   On a phone the wave message wrapped into the home-indicator area. */
+.toast {
+  bottom: calc(var(--sp-5) + env(safe-area-inset-bottom));
+  max-width: min(86vw, 360px); text-align: center; line-height: 1.3;
+  background: rgba(26,18,11,.92); box-shadow: var(--sh-2);
+  border: 1px solid var(--tr-line); border-radius: var(--r-3);
+  transition: opacity var(--t-mid) var(--ease), transform var(--t-mid) var(--ease);
+  transform: translateX(-50%) translateY(10px);
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
 
 #confetti { position: fixed; inset: 0; pointer-events: none; z-index: 20; }
+
+/* ------------------------------- responsive ------------------------------- */
+/* A phone held on its side, and the little iPhones: the hero and the title have
+   to give up their room first, because the buttons cannot. */
+@media (max-height: 560px) {
+  .hero-wrap { height: min(104px, 20vh); }
+  .logo { font-size: clamp(34px, 9vh, 52px); }
+  .tagline { font-size: 14px; margin-bottom: var(--sp-2); }
+  .res-art { height: min(96px, 15vh); }
+  .res-score { font-size: 34px; }
+}
+@media (orientation: landscape) and (max-height: 460px) {
+  .hero-wrap { display: none; }
+  .splash-inner { gap: 2px; padding: var(--sp-3); }
+}
+/* Tablets and desktops: a touch more air, and bigger type where it reads as
+   restraint rather than as a zoomed-in phone. */
+@media (min-width: 700px) {
+  :root { --fs-body: 15px; --fs-small: 13px; --fs-tiny: 12px; }
+  .hero-wrap { width: 340px; height: 168px; }
+  .hunt-grid { grid-template-columns: repeat(auto-fill, minmax(108px, 1fr)); }
+  .hud { font-size: 15px; }
+  .hp { width: 22px; height: 21px; }
+}
+
+/* ---------------------------- reduced motion ------------------------------ */
+/* Everything in the canvas is gated on Art.motion in js/art.js; this is the
+   same promise for the DOM. Focus rings and colour changes stay — they are
+   information, not decoration. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+  .belly i { transition-duration: 1ms !important; }
+}
