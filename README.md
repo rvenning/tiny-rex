@@ -1,6 +1,6 @@
 # Tiny Rex · Endless Feast
 
-Start tiny, eat anything smaller, dodge anything bigger and grow into a Mighty Rex.
+Start tiny, eat anything smaller, dodge anything bigger and grow into a Prowler while larger predators remain dangerous.
 Endless Feast is the whole game: no campaign, unlock gates or finish line.
 Choose Fern Hollow, Bone Gulch, Spike Ridge or Thunder Basin before your run.
 

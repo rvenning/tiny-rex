@@ -31,11 +31,13 @@ const contact = (sim: Simulation, id: string): Entity => ({
   dead: false,
 });
 describe("Tiny Rex rules", () => {
-  it("endless growth reaches Mighty Rex without a campaign win or invalid fuel", () => {
+  it("endless growth caps at Prowler and retains larger predators", () => {
     const sim = new Simulation(null, 37);
     sim.entities = [];
     for (let n = 0; n < 180; n++) sim.eat(contact(sim, "berries"));
-    expect(sim.player.tier).toBe(7);
+    expect(sim.player.tier).toBe(5);
+    expect(relation(species("rex"), sim.player.tier)).toBe("danger");
+    expect(relation(species("gigano"), sim.player.tier)).toBe("danger");
     expect(sim.running).toBe(true);
     expect(Number.isFinite(sim.bellyFraction)).toBe(true);
     const before = sim.player.belly;
@@ -48,6 +50,26 @@ describe("Tiny Rex rules", () => {
     const population = sim.population();
     expect(population.every(([, n]) => n <= 8)).toBe(true);
     expect(population.reduce((total, [, n]) => total + n, 0)).toBeLessThan(90);
+  });
+  it("hunger and predator pursuit keep escalating after population caps", () => {
+    const sample = (wave: number) => {
+      const sim = new Simulation(null, 37);
+      sim.elapsed = wave * 24;
+      sim.wave = wave;
+      sim.player.belly = 4;
+      const predator = contact(sim, "raptor");
+      predator.x = sim.player.x + 100;
+      sim.entities = [predator];
+      sim.update(1 / 60);
+      return {
+        drain: 4 - sim.player.belly,
+        pursuit: 100 - (predator.x - sim.player.x),
+      };
+    };
+    const early = sample(10),
+      late = sample(20);
+    expect(late.drain).toBeGreaterThan(early.drain);
+    expect(late.pursuit).toBeGreaterThan(early.pursuit);
   });
   it("same size is safe, armour never food, plants always edible", () => {
     for (const s of SPECIES)

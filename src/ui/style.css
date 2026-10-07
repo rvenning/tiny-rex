@@ -422,6 +422,7 @@ nav {
   margin-right: 10px;
 }
 .modal-backdrop {
+  pointer-events: auto;
   position: fixed;
   inset: 0;
   z-index: 50;

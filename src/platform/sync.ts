@@ -1,11 +1,8 @@
-import {
-  SaveStore,
-  mergeProgress,
-  type Profile,
-  type Progress,
-} from "./storage";
+import { SaveStore, mergeProgress } from "./storage";
+import { validateProfile, validateProgress } from "./validation";
+import { reconcile } from "./sync-plan";
 import { firebaseConfig } from "./firebase-config";
-/** Firebase is lazy-loaded; local play never waits for network availability. */
+/** Lazy cloud adapter. Local play/saves never wait for connectivity. */
 export async function connectSync(
   store: SaveStore,
   status: (s: string) => void,
@@ -13,32 +10,39 @@ export async function connectSync(
   const queued = new Map<string, unknown>();
   let send: ((key: string, data: unknown) => Promise<void>) | undefined;
   let timer: ReturnType<typeof setTimeout> | undefined;
-  const flush = async () => {
+  let flushing: Promise<boolean> | undefined;
+  let connecting = false;
+  const flush = (): Promise<boolean> => {
     clearTimeout(timer);
     timer = undefined;
-    if (!send) return;
-    for (const [key, data] of [...queued]) {
-      try {
-        await send(key, data);
-        if (queued.get(key) === data) queued.delete(key);
-      } catch {
-        status("Offline · saves on this device");
-        break;
+    if (flushing) return flushing;
+    if (!send) return Promise.resolve(false);
+    flushing = (async () => {
+      for (const [key, data] of [...queued]) {
+        try {
+          await send!(key, data);
+          if (queued.get(key) === data) queued.delete(key);
+        } catch {
+          status("Offline · saves on this device");
+          return false;
+        }
       }
-    }
+      return true;
+    })().finally(() => {
+      flushing = undefined;
+    });
+    return flushing;
   };
   store.onSave = (key, data) => {
-    if (key === "settings") return;
-    if (key === "profiles") {
-      for (const p of data as Profile[]) queued.set("profile_" + p.id, p);
-    } else if (key === "deleted") {
-      for (const id of data as string[])
-        queued.set("deleted_" + id, { id, at: Date.now() });
-    } else queued.set(key, data);
+    // Roster and tombstone lists are local indexes, never whole-roster writes.
+    if (key === "settings" || key === "profiles" || key === "deleted") return;
+    queued.set(key, data);
     clearTimeout(timer);
-    timer = setTimeout(flush, 3000);
+    timer = setTimeout(() => void flush(), 3000);
   };
   const connect = async () => {
+    if (connecting) return;
+    connecting = true;
     try {
       const [appApi, authApi, dbApi] = await Promise.all([
         import("firebase/app"),
@@ -48,61 +52,59 @@ export async function connectSync(
       const app =
         appApi.getApps().find((a) => a.name === "tiny-rex-phaser") ??
         appApi.initializeApp(firebaseConfig, "tiny-rex-phaser");
-      await authApi.signInAnonymously(authApi.getAuth(app));
+      try {
+        await authApi.signInAnonymously(authApi.getAuth(app));
+      } catch {
+        /* Firestore rules still decide access; local saves remain available. */
+      }
       const db = dbApi.getFirestore(app);
-      const snapshots = await dbApi.getDocs(dbApi.collection(db, "tinyrex"));
-      const remoteProfiles: Profile[] = [],
-        remoteProgress = new Map<string, Progress>(),
-        deleted = new Set(store.read<string[]>("deleted", []));
-      for (const d of snapshots.docs) {
-        if (d.id.startsWith("deleted_")) deleted.add(d.id.slice(8));
-        else if (d.id.startsWith("profile_"))
-          remoteProfiles.push(d.data() as Profile);
-        else if (d.id.startsWith("progress_"))
-          remoteProgress.set(d.id.slice(9), d.data() as Progress);
-      }
-      const byId = new Map(
-        store.profiles.filter((p) => !deleted.has(p.id)).map((p) => [p.id, p]),
+      const snapshot = await dbApi.getDocs(dbApi.collection(db, "tinyrex"));
+      reconcile(
+        store,
+        snapshot.docs.map((d) => ({ id: d.id, data: d.data() })),
+        queued,
       );
-      for (const p of remoteProfiles) {
-        if (deleted.has(p.id)) continue;
-        const old = byId.get(p.id);
-        if (!old || p.updated > old.updated) byId.set(p.id, p);
-      }
-      store.write("deleted", [...deleted], false);
-      store.write("profiles", [...byId.values()], false);
-      for (const p of byId.values()) {
-        queued.set("profile_" + p.id, p);
-        const local = store.progress(p.id),
-          remote = remoteProgress.get(p.id);
-        const merged = remote ? mergeProgress(local, remote) : local;
-        store.write("progress_" + p.id, merged, false);
-        queued.set("progress_" + p.id, merged);
-      }
-      for (const id of deleted) {
-        try {
-          localStorage.removeItem("trex_progress_" + id);
-        } catch {}
-        queued.delete("profile_" + id);
-        queued.delete("progress_" + id);
-        queued.set("deleted_" + id, { id, at: Date.now() });
-      }
       send = async (key, data) => {
-        await dbApi.setDoc(
-          dbApi.doc(db, "tinyrex", key),
-          data as Record<string, unknown>,
-        );
-        if (key.startsWith("deleted_")) {
-          const id = key.slice(8);
-          await dbApi.deleteDoc(dbApi.doc(db, "tinyrex", "profile_" + id));
-          await dbApi.deleteDoc(dbApi.doc(db, "tinyrex", "progress_" + id));
-        }
+        const ref = dbApi.doc(db, "tinyrex", key);
+        await dbApi.runTransaction(db, async (tx) => {
+          if (key.startsWith("deleted_")) {
+            const existing = await tx.get(ref);
+            if (existing.exists()) return;
+            const id = key.slice(8);
+            tx.set(ref, data as Record<string, unknown>);
+            tx.delete(dbApi.doc(db, "tinyrex", "profile_" + id));
+            tx.delete(dbApi.doc(db, "tinyrex", "progress_" + id));
+            return;
+          }
+          const id = key.startsWith("profile_") ? key.slice(8) : key.slice(9);
+          const [current, tombstone] = await Promise.all([
+            tx.get(ref),
+            tx.get(dbApi.doc(db, "tinyrex", "deleted_" + id)),
+          ]);
+          if (tombstone.exists()) return;
+          if (key.startsWith("profile_")) {
+            const incoming = validateProfile(data, id),
+              remote = validateProfile(current.data(), id);
+            if (!incoming || (remote && remote.updated >= incoming.updated))
+              return;
+            tx.set(ref, { ...incoming });
+          } else if (key.startsWith("progress_")) {
+            const incoming = validateProgress(data);
+            tx.set(
+              ref,
+              current.exists()
+                ? mergeProgress(validateProgress(current.data()), incoming)
+                : incoming,
+            );
+          }
+        });
       };
-      await flush();
-      status("Family sync connected");
+      if (await flush()) status("Family sync connected");
       store.onChange();
     } catch {
       status("Offline · saves on this device");
+    } finally {
+      connecting = false;
     }
   };
   window.addEventListener("online", () => void connect());

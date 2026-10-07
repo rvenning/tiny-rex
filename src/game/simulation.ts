@@ -192,6 +192,9 @@ export class Simulation {
       ux = dx / d;
       uy = dy / d;
       speed *= 0.75 + 0.25 * sp.aggression!;
+      // Once the wave roster is full, hunts intensify while sprite counts stay bounded.
+      if (this.mode === "feast")
+        speed *= 1 + Math.min(0.35, Math.max(0, this.wave - 8) * 0.025);
       e.hunt -= dt;
       if (e.hunt <= 0) {
         e.hunt = R.huntTime;

@@ -6,7 +6,7 @@ import { Random } from "../src/game/random";
 import type { Level } from "../src/game/types";
 // Reuse the original's player model as an independent test oracle, never at runtime.
 const require = createRequire(import.meta.url);
-const { play } = require("./legacy/brain.cjs");
+const { play, makeBot } = require("./legacy/brain.cjs");
 let sim: Simulation;
 const Game = {
   start: ({ level, seed }: { level: Level; seed: number }) => {
@@ -58,6 +58,40 @@ const context = {
     },
   },
 };
+it("late Feast waves still end runs for the original player bots", () => {
+  const outcomes: {
+    seed: number;
+    wave: number;
+    seconds: number;
+    reason: string;
+  }[] = [];
+  for (const wave of [10, 20])
+    for (const seed of [11, 47, 903]) {
+      sim = new Simulation(null, seed);
+      sim.elapsed = wave * 24;
+      sim.wave = wave;
+      sim.player.belly = 1000;
+      sim.grow();
+      const bot = makeBot(context, "isabelle", seed);
+      let frames = 0;
+      while (sim.running && frames < 180 * 60) {
+        bot.step(1 / 60);
+        sim.update(1 / 60);
+        frames++;
+      }
+      outcomes.push({
+        seed,
+        wave,
+        seconds: frames / 60,
+        reason: sim.result?.reason ?? "cap",
+      });
+      expect(sim.player.tier).toBeLessThanOrEqual(5);
+    }
+  console.info("Late Feast bot survival", JSON.stringify(outcomes));
+  expect(
+    outcomes.filter((o) => o.reason === "caught").length,
+  ).toBeGreaterThanOrEqual(3);
+}, 60000);
 it("a careful player can clear every valley using the original independent bot model", () => {
   const failures: string[] = [];
   let wins = 0;

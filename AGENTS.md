@@ -33,7 +33,7 @@ production build; PWA smoke tests use this, not the dev server. `npm test` runs 
 - `src/game/simulation.ts`: independent seeded game rules, no DOM or Phaser.
 - `src/game/types.ts`: explicit entities, player, events and results.
 - `src/art/painters.js`: original illustration assets adapted to ES modules;
-  keep their presentation-only contract. The remaining insects use these painters.
+  keep their presentation-only contract. All creature sprites now use painted sheets; this module supplies shared shadows.
 - `src/art/storybook.ts`, `landscape.ts`, `assets/`: painted dinosaur/prop atlases,
   calibrated sprite cuts and cached valley scenery.
 - `src/art/textures.ts`: animation and texture generation; no per-frame uploads.
@@ -62,6 +62,4 @@ from WebKit emulation. Do not claim a 60 FPS device result from a headless run.
 ## Deployment
 
 GitHub Actions publishes `dist/` at the existing `/tiny-rex/` route. PRs run verification; Pages publication
-occurs only after merge into main. The repository currently uses branch-based
-Pages; selecting **GitHub Actions** as the Pages source is a review/deployment
-step before accepting the PR. Do not send a newsletter for this experiment.
+occurs only after merge into main. The repository Pages source is GitHub Actions, verified on 7 October 2026. Do not send a newsletter for this experiment.

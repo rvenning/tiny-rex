@@ -87,8 +87,7 @@ The TypeScript app is now at repository root. The old runtime, Game Kit copies,
 manual service worker and old build scripts are removed; their original state
 is recoverable from commit `29cdefb`. Vite produces `dist/`, and GitHub Actions
 deploys that artifact at `/tiny-rex/` after review/merge. No second public route
-or side-by-side game is deployed. Pages must be set to GitHub Actions before
-accepting the PR; live hosting settings have not been changed here.
+or side-by-side game is deployed. Pages is now set to GitHub Actions (verified through the GitHub API on 7 October).
 
 The new service worker cleans only `tiny-rex-v<number>` legacy caches, leaving
 other family games’ caches and all local storage intact. Motion, focus,
@@ -98,12 +97,12 @@ fake family profiles on the live site.
 
 ## Verification of the final replacement
 
-- Production TypeScript check and Vite/PWA build pass; 20 shell/art entries are
-  precached, approximately 3.6 MiB before transport compression.
-- 15 rules/save tests pass, including all original campaign fixtures through an
-  independent legacy player oracle, unlimited growth and bounded late populations.
-- 25 Chromium/WebKit browser checks pass; one explicitly skipped WebKit offline
-  navigation check documents Playwright issue #42775. Both engines validate
+- Production TypeScript check and Vite/PWA build pass; 22 shell/art entries are
+  precached, approximately 4.2 MiB before transport compression.
+- 29 rules/save/sync tests pass, including all original campaign fixtures through an
+  independent legacy player oracle, growth capped at Prowler with larger predators retained and bounded late populations.
+- 30 Chromium/WebKit browser checks pass; two explicitly skipped WebKit offline
+  navigation checks documents Playwright issue #42775. Both engines validate
   cache registration and safe root-cache migration; Chromium reloads/plays offline.
 - Phone portrait/landscape, iPad portrait/landscape and desktop layouts checked;
   real pointer feeding, pause/resume/restart/quit, settings/saves, book, family
@@ -121,3 +120,13 @@ fake family profiles on the live site.
 Physical iPad Safari/audio/installation, sustained device frame budget and live
 Firebase writes were not verified. These are final review items, not claimed
 successes from browser emulation. The branch is published as an unmerged PR.
+
+## PR review follow-up, 7 October 2026
+
+All twelve review findings are addressed. Leaderboard output escapes avatars; local and remote profile/progress reads validate rendered fields. Profile edits queue only the changed record. Reconnect compares semantic data and only queues missing tombstones or changed progress. Firestore transactions preserve a newer remote profile, merge the latest best scores, and prevent a concurrent tombstone from resurrecting a player. Anonymous sign-in failure leaves the rules to decide Firestore access. Mocked SDK tests cover these races without accessing live family data.
+
+Restart records the current run before starting afresh. Keyboard release stops its own target; pointer steering retains ownership independently. Moving Rex resets idle breathing scale. The legacy parent PIN 7777 is restored and explained in Help; plaintext family PINs remain convenience locks. Root-scoped offline navigation and cache cleanup are corrected, and version.json is restored at the original route.
+
+Feast caps growth at tier 5 (Prowler), preserving Rex/Giganotosaurus danger. Population remains bounded for predictable device work. Hunger continues increasing each wave; predator pursuit increases 2.5 percentage points per wave after wave 8, capped at 35% extra speed. The independent legacy Isabelle bot is tested from waves 10 and 20 across three seeds, with at least half the runs caught within three minutes. This is an automated balance guardrail, not a claim about a child’s skill.
+
+Deployment now downloads the exact successful verification build rather than rebuilding. It declares contents-read permission and only main pushes deploy. The replacement remains unmerged for Robert’s final review.

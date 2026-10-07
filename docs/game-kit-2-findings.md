@@ -135,3 +135,7 @@ root URL. Campaign fixtures remain only for migration regression; the public
 game has no campaign or unlock gate. Source, build and deployment live at
 repository root. Desktop GPU performance and restart resource counts were
 measured; these do not substitute for a physical iPad review.
+
+## Review lessons
+
+Sync adapters need per-record dirty tracking, validation at trust boundaries, semantic change detection and transactional writes against the latest remote state. Tombstones must be immutable and checked in the same transaction as updates. Tests should model remote changes between fetch and send, auth failure, malicious fields and reconnect without redundant writes. Publishing should use the artifact actually verified. Renderer population limits require explicit continuing game pressure; they should not silently remove the late-game design.

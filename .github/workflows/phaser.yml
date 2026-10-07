@@ -2,7 +2,7 @@ name: Tiny Rex verification
 on:
   pull_request:
   push:
-    branches: [main, experiment/phaser4-tiny-rex]
+    branches: [main]
 permissions:
   contents: read
 jobs:
@@ -21,18 +21,23 @@ jobs:
       - run: npx playwright install --with-deps chromium webkit
       - run: npm run smoke
       - uses: actions/upload-artifact@v4
+        with:
+          name: tiny-rex-build
+          path: dist
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: phaser-build-and-smoke-results
-          path: |
-            dist
-            test-results
+          name: smoke-results
+          path: test-results
+          if-no-files-found: ignore
 
   deploy:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: verify
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       pages: write
       id-token: write
     environment:
@@ -42,11 +47,10 @@ jobs:
       group: pages
       cancel-in-progress: true
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/download-artifact@v4
         with:
-          node-version: 24
-      - run: npm ci && npm run build
+          name: tiny-rex-build
+          path: dist
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

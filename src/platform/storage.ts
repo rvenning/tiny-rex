@@ -1,4 +1,5 @@
 import type { Result } from "../game/types";
+import { validateProfile, validateProgress } from "./validation";
 export interface Profile {
   id: string;
   name: string;
@@ -72,16 +73,20 @@ export class SaveStore {
     if (key !== "settings") this.onChange();
   }
   get profiles() {
-    return this.read<Profile[]>("profiles", []);
+    const raw = this.read<unknown>("profiles", []);
+    return Array.isArray(raw)
+      ? raw
+          .map((p) => validateProfile(p))
+          .filter((p): p is Profile => p !== null)
+      : [];
   }
   get settings() {
     return this.read<Settings>("settings", { sound: true, lastProfile: null });
   }
   progress(id: string) {
-    return {
-      ...blankProgress(),
-      ...this.read<Progress>("progress_" + id, blankProgress()),
-    };
+    return validateProgress(
+      this.read<unknown>("progress_" + id, blankProgress()),
+    );
   }
   add(name: string, avatar: string, pin: string | null) {
     const now = Date.now(),
@@ -93,7 +98,7 @@ export class SaveStore {
         created: now,
         updated: now,
       };
-    this.write("profiles", [...this.profiles, p]);
+    this.write("profiles", [...this.profiles, p], false);
     this.onSave("profile_" + p.id, p);
     return p;
   }
@@ -102,16 +107,21 @@ export class SaveStore {
     this.write(
       "profiles",
       this.profiles.map((x) => (x.id === p.id ? p : x)),
+      false,
     );
     this.onSave("profile_" + p.id, p);
   }
   remove(id: string) {
-    this.write("deleted", [
-      ...new Set([...this.read<string[]>("deleted", []), id]),
-    ]);
+    this.write(
+      "deleted",
+      [...new Set([...this.read<string[]>("deleted", []), id])],
+      false,
+    );
+    this.onSave("deleted_" + id, { id, at: Date.now() });
     this.write(
       "profiles",
       this.profiles.filter((p) => p.id !== id),
+      false,
     );
     try {
       localStorage.removeItem("trex_progress_" + id);

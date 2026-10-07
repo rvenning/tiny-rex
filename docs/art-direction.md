@@ -2,7 +2,7 @@
 
 The built-in image generation tool produced new transparent game artwork.
 Production assets are `src/art/assets/dinosaurs-storybook.webp`,
-`valley-props-storybook.webp` and `rex-bite-storybook.webp`.
+`valley-props-storybook.webp` `rex-bite-storybook.webp` and `bugs-storybook.webp`.
 WebP quality 92 preserves alpha and reduces the sheets to approximately
 691 KB, 655 KB and 226 KB respectively. No remote asset dependency exists.
 
@@ -43,5 +43,8 @@ alignment canvases are released after the native atlases are baked.
 Detailed border foliage stays outside the central hunting area. Collectible
 bushes and ferns remain saturated; ground decoration is deliberately subdued.
 World textures retain the menu valley and current valley only. New world
-selection replaces unused background textures. Insect artwork still uses the
-original presentation-only painters; all dinosaur and plant sprites are new.
+selection replaces unused background textures. Every creature and plant sprite now uses the new painted artwork.
+
+## Bugs and flyers
+
+The new transparent six-column, three-row sheet matches the dinosaur palette and lighting: copper/teal six-legged beetles, aqua dragonflies with translucent veined wings, and lilac/peach Dimorphodon. Six poses provide tripod walking, wing beats and flapping through native Phaser animations (14, 18 and 10 FPS). Calibrated row cuts prevent wing clipping; per-row alpha bounds preserve a consistent size and baseline. The 606 KB WebP is bundled and precached, and its source texture is released after atlas baking.

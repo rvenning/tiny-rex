@@ -5,7 +5,7 @@ export default defineConfig({
   plugins: [
     VitePWA({
       registerType: "prompt",
-      includeAssets: ["icons/*.png"],
+      includeAssets: ["icons/*.png", "version.json"],
       manifest: {
         id: "/tiny-rex/",
         name: "Tiny Rex · Endless Feast",
@@ -32,12 +32,13 @@ export default defineConfig({
       workbox: {
         globPatterns: ["**/*.{js,css,html,png,webp,woff2}"],
         maximumFileSizeToCacheInBytes: 4000000,
-        cleanupOutdatedCaches: false,
+        // Workbox cleans only obsolete precaches within this registration scope.
+        cleanupOutdatedCaches: true,
         // Retire only this game's old cache; other family games share the origin.
         inlineWorkboxRuntime: true,
         importScripts: ["retire-legacy-cache.js"],
         navigateFallback: "/tiny-rex/index.html",
-        navigateFallbackAllowlist: [/^\/tiny-rex\/phaser\//],
+        navigateFallbackAllowlist: [/^\/tiny-rex\//],
       },
     }),
   ],

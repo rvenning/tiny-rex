@@ -103,6 +103,56 @@ export function prepareStorybook(scene: Scene) {
     h: Math.max(...biteFrames.map((f) => f.h)),
   });
   scene.textures.remove("bite-source");
+  const bugs = scene.textures
+    .get("bugs-source")
+    .getSourceImage() as HTMLImageElement;
+  for (let row = 0; row < 3; row++) {
+    const frames: Frame[] = [];
+    for (let col = 0; col < 6; col++) {
+      const left = Math.round((col * bugs.width) / 6),
+        right = Math.round(((col + 1) * bugs.width) / 6);
+      const bugCuts = [0, 295, 555, 887].map((y) =>
+        Math.round((y * bugs.height) / 887),
+      );
+      const top = bugCuts[row],
+        bottom = bugCuts[row + 1];
+      const canvas = document.createElement("canvas");
+      canvas.width = right - left;
+      canvas.height = bottom - top;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true })!;
+      ctx.drawImage(
+        bugs,
+        left,
+        top,
+        canvas.width,
+        canvas.height,
+        0,
+        0,
+        canvas.width,
+        canvas.height,
+      );
+      const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      let x = canvas.width,
+        y = canvas.height,
+        x2 = 0,
+        y2 = 0;
+      for (let j = 0; j < canvas.height; j++)
+        for (let i = 0; i < canvas.width; i++)
+          if (pixels[(j * canvas.width + i) * 4 + 3] > 100) {
+            x = Math.min(x, i);
+            y = Math.min(y, j);
+            x2 = Math.max(x2, i);
+            y2 = Math.max(y2, j);
+          }
+      frames.push({ canvas, x, y, w: x2 - x + 1, h: y2 - y + 1 });
+    }
+    rows.push(frames);
+    sizes.push({
+      w: Math.max(...frames.map((f) => f.w)),
+      h: Math.max(...frames.map((f) => f.h)),
+    });
+  }
+  scene.textures.remove("bugs-source");
 }
 export function releaseStorybook() {
   rows = [];

@@ -23,6 +23,7 @@ export class PlayScene extends Phaser.Scene {
   private ambient!: Phaser.GameObjects.Particles.ParticleEmitter;
   private publishAt = 0;
   private pointerId: number | null = null;
+  private keyboardDriving = false;
   private effects = 0;
   private lastTier = 0;
   private rexMoving = false;
@@ -49,6 +50,7 @@ export class PlayScene extends Phaser.Scene {
     this.effects = 0;
     this.lastHud = "";
     this.pointerId = null;
+    this.keyboardDriving = false;
     this.sim = new Simulation(null, data.seed ?? Date.now() >>> 0);
     const world = ["hollow", "gulch", "ridge", "basin"][data.world ?? 0];
     this.reduced = !!this.registry.get("reducedMotion");
@@ -136,6 +138,7 @@ export class PlayScene extends Phaser.Scene {
     this.input.keyboard!.on("keydown-ESC", pause);
     this.input.keyboard!.on("keydown-SPACE", pause);
     const aim = (p: Phaser.Input.Pointer) => {
+      this.keyboardDriving = false;
       const point = this.cameras.main.getWorldPoint(p.x, p.y);
       this.sim.target.x = Phaser.Math.Clamp(point.x - P.arenaX, 0, R.width);
       this.sim.target.y = Phaser.Math.Clamp(point.y - P.arenaY, 0, R.height);
@@ -209,12 +212,16 @@ export class PlayScene extends Phaser.Scene {
       dy =
         Number(k.DOWN.isDown || k.S.isDown) - Number(k.UP.isDown || k.W.isDown);
     if (dx || dy) {
+      this.keyboardDriving = true;
       const length = Math.hypot(dx, dy);
       this.sim.target = {
         x: p.x + (dx / length) * 80,
         y: p.y + (dy / length) * 80,
       };
       this.targetRing.setVisible(false);
+    } else if (this.keyboardDriving) {
+      this.sim.target = { x: p.x, y: p.y };
+      this.keyboardDriving = false;
     }
     this.sim.update(dt);
     for (const event of this.sim.events) this.feedback(event);
@@ -317,8 +324,11 @@ export class PlayScene extends Phaser.Scene {
         this.rex.anims.currentAnim?.key?.endsWith("-bite"))
     ) {
       this.rexMoving = moving;
-      if (moving) this.rex.play("rex-" + p.tier);
-      else {
+      if (moving) {
+        if (!this.tweens.isTweening(this.rex))
+          this.rex.setScale(1 / P.atlasResolution);
+        this.rex.play("rex-" + p.tier);
+      } else {
         this.rex.anims.stop();
         this.rex.setFrame("bite-0");
       }

@@ -640,7 +640,7 @@ export const LEVELS: Level[] = [
 export const FEAST = {
   name: "Endless Feast",
   start: 1,
-  maxTier: 7,
+  maxTier: 5,
   plants: 12,
   waveEvery: 24,
   hunger: 0.03,

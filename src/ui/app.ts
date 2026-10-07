@@ -9,6 +9,7 @@ import { Audio } from "../platform/audio";
 import { PlayScene } from "../scenes/PlayScene";
 import type { Result } from "../game/types";
 import { esc } from "./markup";
+import { AVATARS, matchesProfilePin } from "../platform/validation";
 type InstallEvent = Event & {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: string }>;
@@ -133,7 +134,9 @@ export class App {
       document.querySelector<HTMLFormElement>("#pin-form")!.onsubmit = (e) => {
         e.preventDefault();
         const form = e.currentTarget as HTMLFormElement;
-        if (new FormData(form).get("pin") !== profile.pin) {
+        if (
+          !matchesProfilePin(profile, String(new FormData(form).get("pin")))
+        ) {
           form.querySelector(".form-error")!.textContent =
             "That PIN doesn’t match. Try again.";
           return;
@@ -149,7 +152,7 @@ export class App {
   }
   private newProfile() {
     this.modal(
-      `<p class="eyebrow">YOUR ADVENTURE STARTS HERE</p><h2>A new hatchling</h2><form id="profile-form"><label>Your name<input name="name" maxlength="24" required autocomplete="off" placeholder="What should Rex call you?"></label><label>Your avatar<select name="avatar">${["🦖", "🦕", "🐊", "🦎", "🐢", "🐉", "🦊", "🐻", "🦉", "⭐"].map((a) => `<option>${a}</option>`).join("")}</select></label><label>Family PIN <small>Optional · four digits</small><input name="pin" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" type="password" autocomplete="off"></label><p class="form-error" role="alert"></p><button class="button primary">Start my adventure →</button></form>${this.button("Cancel", "close", undefined, "quiet")}`,
+      `<p class="eyebrow">YOUR ADVENTURE STARTS HERE</p><h2>A new hatchling</h2><form id="profile-form"><label>Your name<input name="name" maxlength="24" required autocomplete="off" placeholder="What should Rex call you?"></label><label>Your avatar<select name="avatar">${AVATARS.map((a) => `<option>${a}</option>`).join("")}</select></label><label>Family PIN <small>Optional · four digits</small><input name="pin" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" type="password" autocomplete="off"></label><p class="form-error" role="alert"></p><button class="button primary">Start my adventure →</button></form>${this.button("Cancel", "close", undefined, "quiet")}`,
     );
     document.querySelector<HTMLFormElement>("#profile-form")!.onsubmit = (
       e,
@@ -188,7 +191,7 @@ export class App {
       ),
     );
   }
-  private start(level: number | null) {
+  private start() {
     if (!this.profile) return;
     this.game.registry.set("reducedMotion", this.reducedMotion);
     this.game.scene.stop("Menu");
@@ -197,7 +200,7 @@ export class App {
       "playing",
       `<div class="play-controls">${this.button("Ⅱ Pause", "pause", undefined, "quiet")}${this.button(this.audio.enabled ? "♪ Sound on" : "♪ Sound off", "sound", undefined, "quiet")}</div>`,
     );
-    this.game.scene.start("Play", { level: null, world: this.world });
+    this.game.scene.start("Play", { world: this.world });
     document.getElementById("stage")!.focus();
   }
   private pause() {
@@ -313,8 +316,14 @@ export class App {
   }
   private help() {
     this.modal(
-      `<p class="eyebrow">THE ONE QUESTION</p><h2>Is it smaller than you?</h2><div class="help-rules"><p>🟡 <b>Smaller:</b> dinner. Fill your belly and grow.</p><p>🟢 <b>Same size:</b> safe. Bump noses and carry on.</p><p>🔴 <b>Bigger:</b> run! A red ring warns you up close.</p><p>🛡 <b>Spiky:</b> never food, at any size.</p></div><p>Tap a spot or drag to move. Arrow keys or WASD work too. Escape pauses. Keep eating to grow. Your belly drains as the waves get wilder.</p><p>Install on iPad: Safari → Share → Add to Home Screen. Once loaded, feasts work offline. Family saves sync when connected.</p>${this.install ? this.button("Install Tiny Rex", "install", undefined, "primary") : ""}${this.button(this.reducedMotion ? "Decorative motion off" : "Decorative motion on", "motion", undefined, "quiet")}${this.button("Got it", "close", undefined, "primary")}`,
+      `<p class="eyebrow">THE ONE QUESTION</p><h2>Is it smaller than you?</h2><div class="help-rules"><p>🟡 <b>Smaller:</b> dinner. Fill your belly and grow.</p><p>🟢 <b>Same size:</b> safe. Bump noses and carry on.</p><p>🔴 <b>Bigger:</b> run! A red ring warns you up close.</p><p>🛡 <b>Spiky:</b> never food, at any size.</p></div><p>Tap a spot or drag to move. Arrow keys or WASD work too. Escape pauses. Keep eating to grow. Your belly drains as the waves get wilder.</p><p>Install on iPad: Safari → Share → Add to Home Screen. Once loaded, feasts work offline. Family saves sync when connected. Parents can use 7777 for a forgotten family PIN. PINs are convenience locks, not private passwords.</p>${this.install ? this.button("Install Tiny Rex", "install", undefined, "primary") : ""}${this.button(this.reducedMotion ? "Decorative motion off" : "Decorative motion on", "motion", undefined, "quiet")}${this.button("Got it", "close", undefined, "primary")}`,
     );
+  }
+  private finishRun() {
+    const scene = this.game.scene.getScene("Play") as PlayScene;
+    if (!this.profile || !scene.sim?.running) return;
+    const result = scene.sim.end(false, "quit");
+    if (result) this.store.record(this.profile.id, result);
   }
   private action(action: string, value?: string) {
     const play = () => this.game.scene.getScene("Play") as PlayScene;
@@ -339,10 +348,10 @@ export class App {
         this.map();
         break;
       case "start":
-        this.start(null);
+        this.start();
         break;
       case "feast":
-        this.start(null);
+        this.start();
         break;
       case "pause":
         play().requestPause();
@@ -352,11 +361,11 @@ export class App {
         play().resumeRun();
         break;
       case "restart":
-        this.start(play().sim.level?.idx ?? null);
+        this.finishRun();
+        this.start();
         break;
       case "quit": {
-        const res = play().sim.end(false, "quit");
-        if (res && this.profile) this.store.record(this.profile.id, res);
+        this.finishRun();
         this.map();
         break;
       }

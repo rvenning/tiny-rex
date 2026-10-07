@@ -94,6 +94,18 @@ test("endless feast is immediately playable and real pointer input earns food", 
       Number(await page.locator("#stage").getAttribute("data-score")),
     )
     .toBeGreaterThan(0);
+  const runScore = Number(
+    await page.locator("#stage").getAttribute("data-score"),
+  );
+  await page.getByRole("button", { name: /Pause/ }).click();
+  await page.getByRole("button", { name: "Start a fresh feast" }).click();
+  const saved = await page.evaluate(() => {
+    const profile = JSON.parse(localStorage.getItem("trex_profiles")!)[0];
+    return JSON.parse(localStorage.getItem("trex_progress_" + profile.id)!);
+  });
+  expect(saved.feastBest).toBeGreaterThanOrEqual(runScore);
+  expect(saved.catches).toBeGreaterThan(0);
+  expect(Object.keys(saved.met).length).toBeGreaterThan(0);
   await page.getByRole("button", { name: /Pause/ }).click();
   await page
     .getByRole("button", { name: "Back to feast", exact: true })

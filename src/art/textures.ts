@@ -27,7 +27,14 @@ export function bakeTextures(scene: Phaser.Scene) {
         y = Math.floor(f / 4) * cell;
       ctx.save();
       ctx.translate(x + cell / 2, y + cell / 2);
-      const row = storybookRow(s.shape);
+      const row =
+        s.id === "beetle"
+          ? 7
+          : s.id === "dragonfly"
+            ? 8
+            : s.id === "dimorph"
+              ? 9
+              : storybookRow(s.shape);
       if (row !== undefined) {
         Art.shadow(ctx, r, 1);
         const hue =
@@ -73,7 +80,14 @@ export function bakeTextures(scene: Phaser.Scene) {
         key,
         frame: String(f),
       })),
-      frameRate: 12,
+      frameRate:
+        s.id === "dragonfly"
+          ? 18
+          : s.id === "beetle"
+            ? 14
+            : s.id === "dimorph"
+              ? 10
+              : 12,
       repeat: -1,
     });
   }
