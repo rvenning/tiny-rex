@@ -1,12 +1,27 @@
 {
   "name": "tiny-rex",
-  "version": "1.0.0",
   "private": true,
-  "description": "Eat anything smaller than you, run from anything bigger, and grow from a hatchling into a Mighty Rex.",
+  "type": "module",
   "scripts": {
-    "test": "node --test",
-    "report": "TR_REPORT=1 node --test tests/bot.test.js",
-    "diag": "node tests/diag.js",
-    "icons": "node tools/make-icons.js"
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "test": "vitest run",
+    "smoke": "playwright test",
+    "preview": "vite preview --host 127.0.0.1"
+  },
+  "dependencies": {
+    "firebase": "^12.0.0",
+    "phaser": "4.2.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "prettier": "^3.9.9",
+    "typescript": "^5.9.0",
+    "vite": "^7.0.0",
+    "vite-plugin-pwa": "^1.0.0",
+    "vitest": "^5.0.3"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "^1.13.6"
   }
 }
