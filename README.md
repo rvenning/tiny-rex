@@ -36,7 +36,7 @@ Build and deployment. This PR does not change the current live Pages configurati
 - Six-frame painted dinosaur locomotion, idle breathing, visible jaw-open
   chomping/chewing, growth feedback and reduced-motion controls.
 - Painted berry bushes, curled ferns, rocks, foliage and four distinct valleys.
-- Seven growth sizes, hunger/shrinking, escalating waves and bounded populations.
+- Five growth sizes (Rex tops out at Prowler, so bigger predators stay dangerous), hunger/shrinking, escalating waves and bounded populations.
 - Family profiles/PINs, local saves, optional cloud sync, personal/family bests
   and the Dino Book. Existing `trex_*` saves and campaign records are preserved.
 - Installable offline PWA; updates wait for player approval outside a feast.
@@ -58,3 +58,5 @@ remain on-device review tasks.
 
 See [the agent guide](AGENTS.md), [migration notes](docs/phaser-migration.md),
 [architecture findings](docs/game-kit-2-findings.md) and [art notes](docs/art-direction.md).
+
+Parent PIN override: `7777` unlocks any family PIN. It is a convenience lock, not authentication, and is deliberately not shown in the game.

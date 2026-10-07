@@ -1,6 +1,6 @@
 import * as Phaser from "phaser";
 import { Art } from "./painters";
-import { SPECIES, WORLDS, radius, PLAYER_R } from "../game/content";
+import { SPECIES, WORLDS, FEAST, radius, PLAYER_R } from "../game/content";
 import { presentation as P } from "../game/config";
 import { paintStorybook, storybookRow, releaseStorybook } from "./storybook";
 import { paintPlant, buildLandscape } from "./landscape";
@@ -91,7 +91,7 @@ export function bakeTextures(scene: Phaser.Scene) {
       repeat: -1,
     });
   }
-  for (let tier = 1; tier <= 7; tier++) {
+  for (let tier = 1; tier <= FEAST.maxTier; tier++) {
     const r = PLAYER_R[tier],
       cell = Math.ceil(r * 4.6 + 24),
       key = "rex-" + tier;

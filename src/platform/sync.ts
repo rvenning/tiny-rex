@@ -31,6 +31,10 @@ export async function connectSync(
     })().finally(() => {
       flushing = undefined;
     });
+    // Saves queued while this flush was running were not in its snapshot.
+    void flushing.then((ok) => {
+      if (ok && queued.size) timer = setTimeout(() => void flush(), 3000);
+    });
     return flushing;
   };
   store.onSave = (key, data) => {

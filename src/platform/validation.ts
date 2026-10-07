@@ -5,10 +5,12 @@ export const AVATARS = [
   "🐊",
   "🦎",
   "🐢",
+  "🦅",
   "🐉",
   "🦊",
   "🐻",
   "🦉",
+  "🐙",
   "⭐",
 ];
 export const PARENT_PIN = "7777"; // Original family convenience override, not authentication.

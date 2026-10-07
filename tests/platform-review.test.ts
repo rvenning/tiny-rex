@@ -128,3 +128,7 @@ it("restores the original parent PIN override without accepting arbitrary PINs",
   expect(matchesProfilePin(profile, "7777")).toBe(true);
   expect(matchesProfilePin(profile, "0000")).toBe(false);
 });
+it("keeps every avatar the original game offered", () => {
+  for (const avatar of ["🦖", "🦕", "🐊", "🦎", "🐢", "🦅", "🐉", "🦊", "🐻", "🦉", "🐙", "⭐"])
+    expect(validateProfile({ ...profile, avatar })?.avatar).toBe(avatar);
+});
