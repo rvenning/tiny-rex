@@ -176,10 +176,10 @@ export class PropLayer {
     for (const r of this.live) {
       const img = r.img!;
       let target = 1;
-      if (r.kind !== "solid" || r.name.startsWith("palm") || r.name.startsWith("tree")) {
+      {
         const b = img.getBounds();
         const hides = (p: { x: number; y: number }) => p.y < r.sy && b.contains(p.x, p.y - 40);
-        if (hides(player) || extra.some(hides)) target = r.kind === "soft" ? 0.28 : 0.45;
+        if (hides(player) || extra.some(hides)) target = r.kind === "soft" ? 0.28 : r.kind === "solid" ? 0.5 : 0.4;
       }
       img.alpha += (target - img.alpha) * Math.min(1, dt * 8);
     }
