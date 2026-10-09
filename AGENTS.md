@@ -4,12 +4,10 @@
 
 Tiny Rex is a Phaser 4 + TypeScript/Vite app at repository root. The public
 route stays `/tiny-rex/`. It deliberately imports **no Game Kit modules**.
-Endless Feast remains the classic mode. On 9 October 2026 Robert approved the
-isometric adventure proposal: a connected world with permanent growth and species
-unlocks, implemented alongside classic mode on `feature/isometric-adventure`.
-See `docs/isometric-adventure.md` for current development scope and release gaps.
-The former game is recoverable from Git history (`29cdefb`).
-Use a branch and PR. Robert will perform the final review; do not merge.
+On 9 October 2026 Robert approved the isometric adventure rebuild: one connected world with permanent growth and
+species unlocks that REPLACES Endless Feast (no classic mode). See `docs/isometric-adventure.md` and
+`review-checkpoint.md`. The former game is recoverable from Git history (`29cdefb`).
+Use a branch and PR. Robert performs the final review; do not merge.
 
 ## Commands
 

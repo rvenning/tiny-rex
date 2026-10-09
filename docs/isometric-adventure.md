@@ -1,68 +1,38 @@
-# Isometric adventure — development build
+# Tiny Rex — isometric adventure (rebuild branch)
 
-Robert approved the design and concept mockups on 9 October 2026. This branch
-implements the connected adventure alongside Endless Feast. The concept images
-are an art target, not screenshots of this build. Merge remains Robert's decision.
+The adventure replaces the old Endless Feast: there is no classic mode. Family profiles, PINs and the old
+`trex_progress_*` records are untouched (the adventure keeps its own versioned record, `trex_adventure_v1_<profile>`,
+`world: 2`). Robert approved the design and mockups on 9 October 2026; merge is his decision.
 
 ## Play locally
 
 ```sh
 npm ci
-npm run build
-npm run preview -- --port 4173
+npm run dev -- --port 8125        # http://127.0.0.1:8125/tiny-rex/
+# or: npm run build && npm run preview -- --port 4173
 ```
 
-Open `http://127.0.0.1:4173/tiny-rex/`, choose a profile, then Begin the adventure.
-WASD/arrows move, J bites, Space/K dodges, E/L uses the species skill,
-Enter interacts and Escape pauses. Touch: drag on the world to steer; separate
-action buttons accept another finger. Map & book pauses. Nests heal, save and
-allow switching between discovered species.
+WASD/arrows move (hold Shift to creep and stalk), J bites, Space/K dodges, E/L uses the species skill, Enter rests at a
+nest, Escape pauses. Touch: drag on the left half to steer (a gentle push creeps), action buttons on the right accept
+other fingers. The journal button opens the map, creature book and discoveries.
 
-## Implemented
+## Pipeline (all scripted, nothing hand-placed in the engine)
 
-- Six adjacent regions with growth-gated physical crossings and a cave loop.
-- Four permanent growth stages. Hunting and discoveries grant growth; rivals
-  gate Hunter/Apex milestones. Defeat returns to a discovered nest.
-- Intentional bites, dodges, windups/recovery and three rivals. Roar interrupts;
-  Raptor pounces; Triceratops charges and forages.
-- Eighteen fossils, tracks, species eggs, creature study, clean-hunt records,
-  map/journal and three species with independent growth.
-- Separate versioned adventure records, validated reads, backup recovery,
-  monotonic collection/growth merges and deletion tombstones. Existing
-  `trex_progress_*` records and Endless Feast remain available.
-- Blender-authored sprites and props with a common camera/lighting setup.
+| Step | Tool |
+| --- | --- |
+| World fields, collision, authored composition | `tools/world/worldgen.py`, `hollow.py`, `regions.py` (deterministic, seeded) |
+| Collision/height/props export | `tools/world/export.py` → `public/world/world.json`, `world.bin.gz` |
+| Art-only dressing (start nest, fringe) | `tools/world/dress_hollow.py` |
+| Ground bake (terrain, water, clutter, prop shadows) | `tools/art/render_world.py` (Blender 4.5, Cycles) → `tools/art/publish_tiles.py` |
+| Props and creatures | `tools/art/kit/*`, `tools/art/creatures/*`, `render_props.py`, `pack.py` → `public/art/**` |
+| Preview without 3D re-render | `tools/world/compose_preview.py` |
+| Isolated gameplay screenshots | `tools/qa/shot.mjs`, `tools/qa/splash.mjs` (Firebase and websockets blocked) |
 
-## Asset production
+One projection (`tools/art/common.py` ↔ `src/world/projection.ts`) is shared by the renderer, the game and the
+collision grid, so heights, sprite feet and walkable ground cannot drift apart. Camera: orthographic true-isometric
+(35.264°), 80 px/unit rendered, shown at ~1.35× for the hatchling.
 
-Editable models live in `src/art/sources/*.blend`. The procedural script can
-regenerate them; document hand edits or make changes in the script. Blender is
-a build-time tool, not a browser dependency. No Blender binary is committed.
+## Gaps
 
-```sh
-blender --background --python tools/render_adventure.py -- /absolute/scratch/art
-blender --background --python tools/render_adventure.py -- /absolute/scratch/art --props
-blender --background --python tools/render_adventure.py -- src/art/sources --source-only
-python tools/pack_adventure.py /absolute/scratch/art src/art/assets/adventure
-```
-
-Exports use eight directions/eight poses, transparent 192-pixel frames, packed
-to 144-pixel WebP cells. Props use transparent 256-pixel renders. Foot origin,
-camera and lighting are shared. The manifest records encoded size and decoded
-atlas estimates. Ground textures are cached; feedback and actors are bounded.
-
-## Required before release
-
-This is an integrated development build. Procedural dinosaurs and geometric
-region composition remain simpler than the approved art. Some creature types
-share a model/tint and need distinct silhouettes. Paths, water, landmarks,
-animations and environmental storytelling need further art direction.
-
-Growth thresholds are initial balance values. A multi-hour journey, satisfying
-combat difficulty and adult/child enjoyment have not been demonstrated. Optional
-species shortcuts, cosmetic rewards and richer side objectives remain planned.
-Physical iPad Safari, audio, installation and sustained performance need device
-testing. WebKit viewport checks do not establish those results.
-
-Tests exercise rules, concurrent saves, responsive layouts, keyboard actions,
-journal, reload and classic coexistence. Human playtesting should first assess
-the first hunt/rival, then growth pacing and revisit rewards. Tests do not prove fun.
+See `review-checkpoint.md`. Physical iPad performance, audio mix, human playtests and the unadopted connected world
+(`public/world-connected`, in Codex's copy) remain open. Tests do not prove fun.
