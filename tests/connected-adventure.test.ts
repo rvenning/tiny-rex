@@ -16,11 +16,11 @@ const place = (a:Adventure,x:number,y:number,face=0) => Object.assign(a.player,{
 const move = (a:Adventure,x:number,y:number,n=90) => tick(a,n,{...idleInput(),move:{x,y}});
 const bite = (a:Adventure) => {tick(a,1,{...idleInput(),bite:true});tick(a,20);};
 
-const connectedReady = existsSync('public/world-connected/world.json');
+const connectedReady = existsSync((process.env.WORLD_DIR ?? 'public/world') + '/world.json');
 describe('Connected adventure progression',()=>{
   it.skipIf(!connectedReady)('every authored actor spawns and returns to terrain that fits its body in its authored region',()=>{
-    const meta=JSON.parse(readFileSync(new URL('../public/world-connected/world.json',import.meta.url),'utf8'));
-    const world=parseWorld(meta,gunzipSync(readFileSync(new URL('../public/world-connected/world.bin.gz',import.meta.url))));
+    const meta=JSON.parse(readFileSync(new URL('../' + (process.env.WORLD_DIR ?? 'public/world') + '/world.json',import.meta.url),'utf8'));
+    const world=parseWorld(meta,gunzipSync(readFileSync(new URL('../' + (process.env.WORLD_DIR ?? 'public/world') + '/world.bin.gz',import.meta.url))));
     const a=new Adventure(world,freshAdventure());
     const ordinary=Object.values(SPAWNS).flat().filter(([id,x,y])=>!RIVALS.some(r=>r.species===id&&[r.home,...(r.companions??[])].some(p=>p.x===x&&p.y===y))).length;
     expect(a.actors).toHaveLength(ordinary+RIVALS.reduce((n,r)=>n+1+(r.companions?.length??0),0));
@@ -154,8 +154,8 @@ describe('Connected adventure progression',()=>{
     expect(a.tier).toBe(1);expect(world.grid.fits(a.player.x,a.player.y,a.radius)).toBe(true);expect(a.player.x).toBeGreaterThan(23);
   });
   it.skipIf(!connectedReady)('the actual connected collision grid provides a Rex-sized route to every refuge',()=>{
-    const meta=JSON.parse(readFileSync(new URL('../public/world-connected/world.json',import.meta.url),'utf8'));
-    const world=parseWorld(meta,gunzipSync(readFileSync(new URL('../public/world-connected/world.bin.gz',import.meta.url))));
+    const meta=JSON.parse(readFileSync(new URL('../' + (process.env.WORLD_DIR ?? 'public/world') + '/world.json',import.meta.url),'utf8'));
+    const world=parseWorld(meta,gunzipSync(readFileSync(new URL('../' + (process.env.WORLD_DIR ?? 'public/world') + '/world.bin.gz',import.meta.url))));
     const a=new Adventure(world,{...freshAdventure(),xp:{rex:200,raptor:0,trike:0},rivals:['river-hunter','marsh-pack'],gates:GATES.filter(g=>!g.optional).map(g=>g.id)});
     const start={x:27,y:35},queue=[start],seen=new Set([`${start.x},${start.y}`]);
     const travel=(a as unknown as {canTravel:(from:{x:number,y:number},to:{x:number,y:number})=>boolean}).canTravel.bind(a);

@@ -10,11 +10,11 @@ import { proj, unproj } from "../src/world/projection";
 
 const load = () => {
   const meta = JSON.parse(
-    readFileSync("public/world/world.json", "utf8"),
+    readFileSync((process.env.WORLD_DIR ?? "public/world") + "/world.json", "utf8"),
   ) as WorldMeta;
   return parseWorld(
     meta,
-    new Uint8Array(gunzipSync(readFileSync("public/world/world.bin.gz"))),
+    new Uint8Array(gunzipSync(readFileSync((process.env.WORLD_DIR ?? "public/world") + "/world.bin.gz"))),
   );
 };
 
