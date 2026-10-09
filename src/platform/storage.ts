@@ -1,4 +1,4 @@
-import type { Result } from "../game/types";
+import type { Result } from "./historical-result";
 import { validateProfile, validateProgress } from "./validation";
 export interface Profile {
   id: string;
@@ -125,6 +125,8 @@ export class SaveStore {
     );
     try {
       localStorage.removeItem("trex_progress_" + id);
+      localStorage.removeItem("trex_adventure_v1_" + id);
+      localStorage.removeItem("trex_adventure_v1_" + id + "_backup");
     } catch {}
     const s = this.settings;
     if (s.lastProfile === id)

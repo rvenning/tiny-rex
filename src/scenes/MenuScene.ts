@@ -1,45 +1,61 @@
 import * as Phaser from "phaser";
-import { presentation } from "../game/config";
+import { proj } from "../world/projection";
+import type { World } from "../world/world";
+import { ActorView } from "./adventure/actor-view";
+import { loadCreature, loadProps } from "./adventure/assets";
+import { GroundLayer, PropLayer } from "./adventure/world-view";
+
+/** Title backdrop: the real Fern Hollow, a hatchling idling in the clearing, a slow drifting camera. */
 export class MenuScene extends Phaser.Scene {
+  private ground?: GroundLayer;
+  private props?: PropLayer;
+  private rex?: ActorView;
+  private t = 0;
+  private alive = false;
   constructor() {
     super("Menu");
   }
   create() {
-    this.cameras.main.setOrigin(0, 0).setZoom(presentation.renderScale);
-    this.add
-      .image(210, 370, "hollow-floor")
-      .setDisplaySize(420, 740)
-      .setAlpha(0.4);
-    this.add.image(210, 370, "hollow-fringe").setDisplaySize(420, 740);
-    const glow = this.add.circle(210, 330, 96, 0xffdca0, 0.1);
-    const hero = this.add.sprite(210, 320, "rex-5", "bite-0").setScale(1.125);
-    if (!this.registry.get("reducedMotion")) {
-      hero.setFrame("bite-0");
-      this.tweens.add({
-        targets: hero,
-        scaleX: 1.14,
-        scaleY: 1.1,
-        duration: 1500,
-        yoyo: true,
-        repeat: -1,
-        ease: "Sine.easeInOut",
-      });
-      this.tweens.add({
-        targets: hero,
-        y: 313,
-        duration: 1900,
-        yoyo: true,
-        repeat: -1,
-        ease: "Sine.easeInOut",
-      });
-      this.tweens.add({
-        targets: glow,
-        alpha: 0.2,
-        scale: 1.15,
-        duration: 2400,
-        yoyo: true,
-        repeat: -1,
-      });
-    }
+    this.alive = true;
+    const world = this.registry.get("world") as World | undefined;
+    this.cameras.main.setBackgroundColor("#1b3322");
+    if (!world) return;
+    void Promise.all([loadProps(this), loadCreature(this, "rex_0")]).then(() => {
+      if (!this.alive || !this.sys.isActive()) return;
+      this.ground = new GroundLayer(this, world);
+      this.props = new PropLayer(this, world);
+      const n = world.meta.pois.start_nest;
+      this.rex = new ActorView(this, "rex_0", 1, 0.45, 0xcfe7b0);
+      this.rex.update(0, n[0] + 2.2, n[1] + 1.2, world.grid.height(n[0] + 2.2, n[1] + 1.2), Math.PI / 4, "idle");
+      // Let the title become interactive only after its shared atlases finish.
+      // Stopping Menu earlier cancels its loader and strands Adventure's shared promises.
+      this.registry.set("ready", true);
+      window.dispatchEvent(new Event("rex-ready"));
+    });
+    this.events.once("shutdown", () => {
+      this.alive = false;
+      this.ground?.destroy();
+      this.props?.destroy();
+      this.rex?.destroy();
+      this.ground = this.props = this.rex = undefined;
+    });
+  }
+  update(_t: number, delta: number) {
+    const world = this.registry.get("world") as World | undefined;
+    if (!world || !this.ground || !this.props) return;
+    const dt = delta / 1000;
+    this.t += dt;
+    const cam = this.cameras.main;
+    const n = world.meta.pois.start_nest;
+    const reduced = !!this.registry.get("reducedMotion");
+    const dpr = Math.max(1, this.scale.width / innerWidth);
+    const zoom = Math.max(0.6, Math.min(1.5, Math.min(innerWidth / 1100, innerHeight / 800))) * dpr;
+    cam.setZoom(zoom);
+    const c = proj(n[0] + 3, n[1] + 0.5, 0);
+    const sway = reduced ? 0 : Math.sin(this.t * 0.2) * 40;
+    cam.centerOn(c.x + sway, c.y - 60);
+    this.ground.update(cam.worldView, true);
+    this.props.update(cam.worldView);
+    this.rex?.update(dt, n[0] + 2.2, n[1] + 1.2, world.grid.height(n[0] + 2.2, n[1] + 1.2), Math.PI / 4, "idle");
   }
 }

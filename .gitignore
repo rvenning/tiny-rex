@@ -2,3 +2,10 @@ node_modules/
 dist/
 test-results/
 playwright-report/
+
+art-build/
+.scratch/
+__pycache__/
+*.blend1
+art-reference/
+docs/review/*.png

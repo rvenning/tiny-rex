@@ -1,25 +1,50 @@
 import * as Phaser from "phaser";
 import { registerSW } from "virtual:pwa-register";
 import { BootScene } from "./scenes/BootScene";
+import { AdventureScene } from "./scenes/AdventureScene";
 import { MenuScene } from "./scenes/MenuScene";
-import { PlayScene } from "./scenes/PlayScene";
-import { presentation } from "./game/config";
 import { App } from "./ui/app";
 import "./ui/style.css";
+import "./ui/hud.css";
 
+/** Render resolution: crisp on retina, capped so older iPads keep a steady frame rate. */
+export function renderScale() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const budget = Number(localStorage.getItem("trex_pixel_budget")) || 3_300_000;
+  const px = innerWidth * innerHeight * dpr * dpr;
+  return px > budget ? Math.max(1, Math.sqrt(budget / (innerWidth * innerHeight))) : dpr;
+}
 document.getElementById("stage")!.tabIndex = 0;
+const s0 = renderScale();
 const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: "stage",
-  width: presentation.width * presentation.renderScale,
-  height: presentation.height * presentation.renderScale,
+  width: Math.round(innerWidth * s0),
+  height: Math.round(innerHeight * s0),
   backgroundColor: "#152820",
-  scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-  input: { activePointers: 3 },
-  render: { antialias: true, roundPixels: false },
+  scale: { mode: Phaser.Scale.NONE, zoom: 1 / s0, autoCenter: Phaser.Scale.NO_CENTER },
+  input: { activePointers: 4 },
+  render: { antialias: true, roundPixels: false, powerPreference: "high-performance" },
   fps: { target: 60 },
-  scene: [BootScene, MenuScene, PlayScene],
+  scene: [BootScene, MenuScene, AdventureScene],
 });
+let fitFrame = 0;
+/** Keep the canvas exactly as large as the window. Phaser's own zoom bookkeeping can lag one resize behind, so the
+ *  CSS box is set explicitly and the scale manager is told to re-measure it (input coordinates depend on that). */
+function fit() {
+  cancelAnimationFrame(fitFrame);
+  fitFrame = requestAnimationFrame(() => {
+    const s = renderScale();
+    game.scale.resize(Math.round(innerWidth * s), Math.round(innerHeight * s));
+    game.scale.setZoom(1 / s);
+    const c = game.canvas;
+    c.style.width = innerWidth + "px";
+    c.style.height = innerHeight + "px";
+    game.scale.refresh();
+  });
+}
+addEventListener("resize", fit);
+addEventListener("orientationchange", () => setTimeout(fit, 120));
 const app = new App(game);
 // Updates are offered between hunts; no automatic reload mid-run.
 const update = registerSW({
@@ -28,46 +53,17 @@ const update = registerSW({
     el.className = "update-button";
     el.textContent = "A fresh adventure is ready · update";
     el.onclick = () => {
-      if (document.body.dataset.screen !== "playing") void update(true);
-      else el.textContent = "Finish this feast, then tap to update";
+      if (document.body.dataset.screen !== "adventure") void update(true);
+      else el.textContent = "Rest at a nest, then tap to update";
     };
     document.body.append(el);
   },
 });
-// Read-only diagnostics support smoke tests without cheating controls in production.
+// Read-only diagnostics for browser tests; nothing here can change the game.
 Object.assign(window, {
-  rexDiagnostics: () => {
-    const play = game.scene.getScene("Play") as PlayScene;
-    const sim = play.sim;
-    return {
-      phaser: Phaser.VERSION,
-      scene: game.scene.isActive("Play") ? "Play" : "Menu",
-      paused: game.scene.isPaused("Play"),
-      textures: game.textures.getTextureKeys().length,
-      fps: game.loop.actualFps,
-      pointers: game.input.pointers.length,
-      displayObjects: play.children?.list.length ?? 0,
-      textureBytes: game.textures.getTextureKeys().reduce((bytes, key) => {
-        const image = game.textures
-          .get(key)
-          .getSourceImage() as HTMLCanvasElement;
-        return bytes + image.width * image.height * 4;
-      }, 0),
-      savesAvailable: app.store.available,
-      animation: play.animationState,
-      player: sim
-        ? { x: sim.player.x, y: sim.player.y, tier: sim.player.tier }
-        : null,
-      target: sim ? { ...sim.target } : null,
-      entities:
-        sim?.entities.map((e) => ({
-          id: e.id,
-          x: e.x,
-          y: e.y,
-          plant: e.sp.kind === "plant",
-          tier: e.sp.tier,
-          spiky: e.sp.spiky,
-        })) ?? [],
-    };
+  adventureDiagnostics: () => {
+    const adventure = game.scene.getScene("Adventure") as AdventureScene;
+    return adventure.sim ? adventure.diagnostics() : null;
   },
+  __rex: { game, app },
 });

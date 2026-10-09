@@ -1,6 +1,7 @@
 import { beforeEach, afterEach, it, expect, vi } from "vitest";
 import { SaveStore, blankProgress } from "../src/platform/storage";
 import { connectSync } from "../src/platform/sync";
+import { AdventureStore, freshAdventure } from "../src/adventure/save";
 const fake = vi.hoisted(() => ({
   docs: new Map<string, unknown>(),
   writes: [] as string[],
@@ -75,6 +76,58 @@ beforeEach(() => {
 afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
+});
+it("merges concurrent adventure discoveries without touching legacy progress", async () => {
+  const a = freshAdventure(),
+    b = freshAdventure();
+  a.xp.rex = 120;
+  a.updated = 100;
+  a.snapshot.at = 100;
+  a.discoveries = ["fossil-hollow-0"];
+  b.xp.raptor = 180;
+  b.updated = 200;
+  b.snapshot.at = 200;
+  b.discoveries = ["fossil-river-0"];
+  const store = new SaveStore();
+  new AdventureStore().write("isabelle", a);
+  fake.docs.set("adventure_v1_isabelle", b);
+  await connectSync(store, () => {});
+  await vi.advanceTimersByTimeAsync(4000);
+  expect(new AdventureStore().read("isabelle").discoveries).toHaveLength(2);
+  expect((fake.docs.get("adventure_v1_isabelle") as any).xp).toEqual({
+    rex: 120,
+    raptor: 180,
+    trike: 0,
+  });
+  expect(fake.docs.get("progress_isabelle")).toEqual(blankProgress());
+});
+it("a tombstone prevents adventure resurrection and removes its local backup", async () => {
+  const store = new SaveStore();
+  const adventure = new AdventureStore();
+  const s = freshAdventure();
+  s.updated = 100;
+  s.snapshot.at = 100;
+  adventure.write("isabelle", s);
+  adventure.write("isabelle", s);
+  fake.docs.set("deleted_isabelle", { id: "isabelle", at: 101 });
+  await connectSync(store, () => {});
+  expect(localStorage.getItem("trex_adventure_v1_isabelle")).toBeNull();
+  expect(localStorage.getItem("trex_adventure_v1_isabelle_backup")).toBeNull();
+  store.onSave("adventure_v1_isabelle", s);
+  await vi.advanceTimersByTimeAsync(4000);
+  expect(fake.docs.has("adventure_v1_isabelle")).toBe(false);
+});
+it("recovers a corrupt adventure from the previous valid snapshot", () => {
+  const adventure = new AdventureStore();
+  const s = freshAdventure();
+  s.updated = 1;
+  s.xp.rex = 80;
+  adventure.write("isabelle", s);
+  s.updated = 2;
+  s.xp.rex = 100;
+  adventure.write("isabelle", s);
+  localStorage.setItem("trex_adventure_v1_isabelle", "{broken");
+  expect(adventure.read("isabelle").xp.rex).toBe(80);
 });
 it("continues to rules-controlled Firestore access after an anonymous-auth failure", async () => {
   fake.auth.mockRejectedValueOnce(new Error("Auth config disabled"));

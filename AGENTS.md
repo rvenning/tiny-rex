@@ -4,9 +4,10 @@
 
 Tiny Rex is a Phaser 4 + TypeScript/Vite app at repository root. The public
 route stays `/tiny-rex/`. It deliberately imports **no Game Kit modules**.
-Robert requested Endless Feast only: no campaign screens or unlock gate.
-The former game is recoverable from Git history (`29cdefb`).
-Use a branch and PR. Robert will perform the final review; do not merge.
+On 9 October 2026 Robert approved the isometric adventure rebuild: one connected world with permanent growth and
+species unlocks that REPLACES Endless Feast (no classic mode). See `docs/isometric-adventure.md` and
+`review-checkpoint.md`. The former game is recoverable from Git history (`29cdefb`).
+Use a branch and PR. Robert performs the final review; do not merge.
 
 ## Commands
 
@@ -45,8 +46,9 @@ production build; PWA smoke tests use this, not the dev server. `npm test` runs 
 
 New behavior starts in typed content/config or pure rules. Emit a typed event
 for feedback; let PlayScene consume it. Add meaningful rules tests for changed
-invariants. Keep all creatures on the fixed logical arena so size remains
-legible. Touch targets >=48px, single-pointer movement ownership, pause on
+invariants. Classic mode retains its fixed logical arena. Adventure rules live
+in `src/adventure/` and rendering/input in `src/scenes/AdventureScene.ts`.
+Keep growth and threat sizes legible. Touch targets >=48px, single-pointer movement ownership, pause on
 visibility loss, safe-area layout and reduced-motion support are required.
 
 Save keys `trex_*` and cloud collection `tinyrex` are compatible with the
