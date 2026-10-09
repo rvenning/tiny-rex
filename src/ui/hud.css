@@ -595,3 +595,17 @@
     margin: -54px 0 0 -54px;
   }
 }
+/* Atmosphere: warm golden light from the upper left, cool deep-forest vignette. Purely decorative. */
+.hud::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 120% 100% at 50% 46%, transparent 52%, rgba(6, 22, 14, 0.5) 100%),
+    linear-gradient(130deg, rgba(255, 206, 128, 0.14), rgba(255, 206, 128, 0) 42%);
+  z-index: 0;
+}
+.hud > * {
+  z-index: 1;
+}

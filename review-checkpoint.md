@@ -1,25 +1,19 @@
-# Review checkpoint (work in progress, NOT yet playable)
+# Review checkpoint — Fern Hollow opening is playable (2026-10-10)
 
-Branch: `rebuild/isometric-world` (local; not pushed; no PR yet). The draft `feature/isometric-adventure` is untouched.
-Preview URL: none yet. There are no gameplay screenshots yet; the game does not build at this commit.
+Branch `rebuild/isometric-world` (local, not pushed). Live game and the draft PR are untouched.
+Preview: `npx vite --host 127.0.0.1 --port 8125` then http://127.0.0.1:8125/tiny-rex/ (choose a profile, Continue).
+Isolated screenshots (Firebase + websockets blocked, throwaway storage): `node tools/qa/shot.mjs out.png 1448 1086 [x,y]`.
 
-## Done
-- Shared Blender recipe (`tools/art/common.py`): isometric camera, lighting, 80 px/unit, anchors verified.
-- Prop harness + atlas packer + contact sheets (`render_props.py`, `pack.py`, `sheet.py`).
-- World generator (`tools/world/`): composed Fern Hollow (creek + waterfall behind, raised rocky bank/perch right,
-  log arch left, egg nest by trail, stepping-stone ford), shared terrain/collision/height export, reachability tests.
-- Ground renderer (`tools/art/render_world.py`): terrain, water, waterfall shaders (first pass only, still flat).
-- `tools/world/compose_preview.py`: cheap terrain + props composite for art review.
-- New TS layer: projection, collision grid, world loader, simulation (stalking prey, telegraphed lunges, growth,
-  dodge/bite/roar), HUD, scene, app shell. Written but NOT yet compiled or run.
-- Five Blender art agents were launched (Rex line, raptor family, other creatures, vegetation, rocks/logs);
-  partial outputs in `art-build/` (git-ignored). Early ferns, tree ferns and log arch look promising.
+Screenshots: `docs/review/01-opening-d.png` (start nest), `docs/review/02-perch-raptor.png` (raptor recovery window, "bite now" prompt).
 
-## Known gaps / next steps
-1. Run `npx tsc --noEmit`; delete the classic Endless Feast code (PlayScene, game/simulation, legacy art, old tests,
-   old `style.css` rules) and fix imports; rewrite `tests/adventure.test.ts`; write new `style.css`.
-2. Pack art into `public/art/**` (props + creature atlases) and ground tiles into `public/world/ground/**`
-   (slice 2048 renders into 512 tiles; write `tiles.json`); add `public/world/world.json` tile list.
-3. Render ground with prop shadows, canopy shadows and baked clutter; shrink the oversized bare clearing.
-4. Screenshot in-game vs the mockups, iterate, then expand to other regions.
-5. Physical iPad, audio mix, performance and human playtesting are all unverified.
+## State
+- Adopted Codex's repaired snapshot (compiling build, packed Rex x4 / raptor / trike / prey atlases, 117 Hollow ground tiles,
+  save migration, 61 passing unit tests). The connected six-region world (`public/world-connected`) is NOT adopted; its two tests fail until then.
+- This pass: closer camera (hatchling ~13% of width, stage zoom 1.35/1.2/1.05/0.92), warm light + forest vignette,
+  a real start nest with eggs, ringed boulders, layered fern/broadleaf/flower fringe (`tools/world/dress_hollow.py`, art-only, no collision change).
+
+## Gaps vs the approved mockups (next)
+1. Ground bake: bare dirt expanse with evenly spaced identical grass tufts, straight grass/dirt seam, flat turquoise creek
+   (no rocks/foam), no dapple from canopy. Needs a Hollow re-render with a smaller clearing, irregular edges, clustered clutter, shoreline rocks.
+2. Rex art: apex still shows pale curved neck marks; materials are acceptable at game size but not yet the reference's integrated markings.
+3. Audio mix, physical iPad performance, human playtests, other regions: unverified / not done.

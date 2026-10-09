@@ -269,7 +269,7 @@ export class AdventureScene extends Phaser.Scene {
     cam.setSize(this.scale.width, this.scale.height);
   }
   private stageZoom() {
-    return [1, 0.94, 0.88, 0.82][this.sim.tier];
+    return [1.35, 1.2, 1.05, 0.92][this.sim.tier];
   }
   private snapCamera() {
     const p = this.sim.player;
