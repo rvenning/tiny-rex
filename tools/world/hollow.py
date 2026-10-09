@@ -220,9 +220,45 @@ def scatter(T):
     def open_or_fringe(x, y):
         return at(T.D, x, y) < 5.5 and dry(x, y) and at(T.plateau, x, y) < 0.3
 
-    for n, r, nv in [("grass_tuft", 1.0, 5), ("rock_pebbles", 1.6, 5), ("clover_patch", 3.0, 2), ("moss_clump", 3.2, 2), ("fern_small", 1.7, 4), ("mushroom_cluster", 6.5, 3), ("flower_purple", 4.2, 3)]:
-        for x, y in poisson(rng, (-6, -6, 90, 90), r, open_or_fringe):
-            k = at(T.keep, x, y)
-            if k > 0.5 and rng.random() < (0.92 if n in ("fern_small", "moss_clump", "mushroom_cluster", "flower_purple") else 0.5):
+    # Ground clutter is CLUSTERED, not evenly spaced: meadow patches with tufts of mixed size, pebble fields,
+    # bare soil between them, and a few isolated singles. Keep-clear (combat) ground stays calmer.
+    def clutter_ok(x, y):
+        return open_or_fringe(x, y)
+
+    def calm(x, y):
+        return at(T.keep, x, y) > 0.5
+
+    # meadow patches: tufts + clover + small ferns around a centre
+    for cx, cy in poisson(rng, (-6, -6, 90, 90), 2.8, clutter_ok):
+        if rng.random() < (0.5 if calm(cx, cy) else 0.92):
+            n_t = int(rng.integers(6, 15))
+            sigma = rng.uniform(0.6, 1.3)
+            for _ in range(n_t):
+                x, y = cx + rng.normal(0, sigma), cy + rng.normal(0, sigma)
+                if not clutter_ok(x, y):
+                    continue
+                roll = rng.random()
+                if roll < 0.62:
+                    put("grass_tuft", x, y, nv=5, s=rng.uniform(0.55, 1.55))
+                elif roll < 0.74:
+                    put("clover_patch", x, y, nv=2, s=rng.uniform(0.7, 1.4))
+                elif roll < 0.86 and not calm(x, y):
+                    put("fern_small", x, y, nv=4, s=rng.uniform(0.7, 1.3))
+                else:
+                    put("moss_clump", x, y, nv=2, s=rng.uniform(0.8, 1.4))
+    # pebble fields near rocks and along the water
+    for cx, cy in poisson(rng, (-6, -6, 90, 90), 6.5, lambda x, y: at(T.D, x, y) < 7 and at(T.plateau, x, y) < 0.3):
+        for _ in range(int(rng.integers(3, 8))):
+            x, y = cx + rng.normal(0, 0.8), cy + rng.normal(0, 0.8)
+            put("rock_pebbles", x, y, nv=5, s=rng.uniform(0.7, 1.6))
+    # isolated singles, a few mushrooms and flowers in the shade
+    for n, r, nv, keep in [("grass_tuft", 2.3, 5, 0.45), ("flower_purple", 5.5, 3, 0.15), ("mushroom_cluster", 8.0, 3, 0.1)]:
+        for x, y in poisson(rng, (-6, -6, 90, 90), r, clutter_ok):
+            if calm(x, y) and rng.random() > keep * 0.6:
                 continue
-            put(n, x, y, nv=nv, s=rng.uniform(0.8, 1.2))
+            if rng.random() < keep + 0.2:
+                put(n, x, y, nv=nv, s=rng.uniform(0.7, 1.4))
+    # stones seen through the shallows and lining the creek bed
+    for x, y in poisson(rng, (4, 12, 86, 40), 2.4, lambda x, y: not dry(x, y)):
+        if rng.random() < 0.55:
+            put("rock_pebbles", x, y, nv=5, s=rng.uniform(0.9, 2.0), z=z_at(x, y))

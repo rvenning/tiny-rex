@@ -30,7 +30,7 @@ const ICONS: Record<string, string> = {
   charge: `<svg viewBox="0 0 64 64" aria-hidden="true"><path fill="currentColor" d="M6 40c4-12 16-18 30-16l14-10-2 14 8 8-14 2-6 10-6-9-24-3z"/><path fill="currentColor" d="M2 30h14v4H2zM0 40h12v4H0z" opacity=".6"/></svg>`,
   lock: `<svg viewBox="0 0 64 64" aria-hidden="true"><path fill="currentColor" d="M16 28h32v26H16z"/><path fill="none" stroke="currentColor" stroke-width="6" d="M22 28v-8a10 10 0 0 1 20 0v8"/></svg>`,
   pause: `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>`,
-  book: `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M5 4h6c1 0 1.5.4 1 1v15c-.5-.6-1-1-2-1H5zM19 4h-6c-1 0-1.5.4-1 1v15c.5-.6 1-1 2-1h5z"/></svg>`,
+  book: `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" d="M12 6.5C9.8 5 7 4.6 4 5v13c3-.4 5.8.1 8 1.6 2.2-1.5 5-2 8-1.6V5c-3-.4-5.8 0-8 1.5zM12 6.5v13"/></svg>`,
 };
 const heart = (fill: number, id: number) =>
   `<svg viewBox="0 0 32 30" class="heart" aria-hidden="true"><defs><clipPath id="hc${id}"><rect width="${Math.max(0, Math.min(1, fill)) * 32}" height="30"/></clipPath></defs><path d="M16 28C4 19 1 13 1 8a7 7 0 0 1 15-2 7 7 0 0 1 15 2c0 5-3 11-15 20z" fill="#1d0f12" stroke="#f2a1a1" stroke-width="2"/><path clip-path="url(#hc${id})" d="M16 28C4 19 1 13 1 8a7 7 0 0 1 15-2 7 7 0 0 1 15 2c0 5-3 11-15 20z" fill="#e8454d"/></svg>`;

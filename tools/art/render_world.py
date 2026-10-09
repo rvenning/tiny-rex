@@ -252,8 +252,10 @@ def build_ground_material():
     pert = {}
     tot = None
     for k, wsock in W.items():
-        p = T.math("MULTIPLY", wsock, T.math("ADD", 0.35, T.math("MULTIPLY", T.noise(pos, 1.7 + 0.37 * len(pert), 3, 0.6), 1.3)))
-        p = T.math("POWER", p, 1.6)
+        nz = T.noise(pos, 2.4 + 0.5 * len(pert), 5, 0.62)
+        # ragged, organic boundaries: push each weight through a noisy contrast curve so dirt/grass meet in tongues and patches
+        sharp = T.math("MINIMUM", T.math("MAXIMUM", T.math("MULTIPLY", T.math("SUBTRACT", T.math("ADD", wsock, T.math("MULTIPLY", T.math("SUBTRACT", nz, 0.5), 1.25)), 0.4), 2.3), 0.0), 1.0)
+        p = T.math("ADD", sharp, T.math("MULTIPLY", wsock, 0.04))
         pert[k] = p
         tot = p if tot is None else T.math("ADD", tot, p)
     tot = T.math("MAXIMUM", tot, 1e-4)

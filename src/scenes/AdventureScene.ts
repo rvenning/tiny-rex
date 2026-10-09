@@ -151,6 +151,7 @@ export class AdventureScene extends Phaser.Scene {
     });
     this.loadingEl?.remove();
     this.ready = true;
+    this.startAmbience();
     this.hud.toast(this.hud.root.classList.contains("touch") ? "Stalk a beetle · move the stick gently to creep" : "Stalk a beetle · hold Shift to creep, J to bite", "hint");
   }
   private playerAtlasId() {
@@ -232,7 +233,20 @@ export class AdventureScene extends Phaser.Scene {
       window.removeEventListener("resize", resize);
     });
   }
+  private startAmbience() {
+    const audio = this.registry.get("audio") as Audio;
+    audio.startAmbience(() => {
+      const p = this.sim.player;
+      let wet = 0;
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2;
+        if (this.world.grid.inWater(p.x + Math.cos(a) * 7, p.y + Math.sin(a) * 7)) wet++;
+      }
+      return { water: Math.min(1, wet / 4) };
+    });
+  }
   private teardown() {
+    (this.registry.get("audio") as Audio)?.stopAmbience();
     this.persist();
     for (const fn of this.cleanup) fn();
     this.hud?.destroy();
@@ -799,11 +813,13 @@ export class AdventureScene extends Phaser.Scene {
     this.held = { bite: false, dodge: false, skill: false };
     this.input.keyboard?.resetKeys();
     this.persist();
+    (this.registry.get("audio") as Audio).stopAmbience();
     this.game.scene.pause("Adventure");
     window.dispatchEvent(new Event("rex-adventure-pause"));
   }
   resumeAdventure() {
     this.input.keyboard?.resetKeys();
+    this.startAmbience();
     this.game.scene.resume("Adventure");
   }
   diagnostics() {
