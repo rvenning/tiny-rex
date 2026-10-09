@@ -71,18 +71,29 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--only", default="")
     ap.add_argument("--samples", type=int, default=64)
+    ap.add_argument("--resume", action="store_true", help="Reuse completed frames from an interrupted batch")
     a = ap.parse_args(args_after_dashes())
     reg = load_registry()
     only = [s for s in a.only.split(",") if s]
     mpath = os.path.join(a.out, "frames.json")
-    prior = json.load(open(mpath))["frames"] if os.path.exists(mpath) and only else []
-    prior = [f for f in prior if f["key"].split("/")[0] not in (only or [])]
+    os.makedirs(a.out, exist_ok=True)
+    prior = json.load(open(mpath))["frames"] if os.path.exists(mpath) and (only or a.resume) else []
+    if not a.resume:
+        prior = [f for f in prior if f["key"].split("/")[0] not in (only or [])]
     frames = prior
+    completed = {f["key"] for f in frames if os.path.exists(os.path.join(a.out, f["file"]))}
     for name, prop in reg.items():
         if only and name not in only:
             continue
         for v in range(prop.variants):
+            if a.resume and f"{name}/{v}" in completed:
+                continue
             frames.append(render_one(name, prop, v, a.out, a.samples))
+            # A crash or cancellation retains every completed frame's metadata.
+            tmp = mpath + ".tmp"
+            with open(tmp, "w") as fh:
+                json.dump({"frames": frames}, fh, indent=1)
+            os.replace(tmp, mpath)
             print("RENDERED", name, v, flush=True)
     os.makedirs(a.out, exist_ok=True)
     json.dump({"frames": frames}, open(mpath, "w"), indent=1)

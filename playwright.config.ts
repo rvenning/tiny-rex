@@ -6,7 +6,7 @@ export default defineConfig({
   timeout: 90000,
   expect: { timeout: 15000 },
   use: {
-    baseURL: "http://127.0.0.1:4173/tiny-rex/",
+    baseURL: "http://127.0.0.1:4175/tiny-rex/",
     trace: "retain-on-failure",
   },
   projects: [
@@ -24,8 +24,9 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "npm run preview -- --port 4173",
-    url: "http://127.0.0.1:4173/tiny-rex/",
+    command: "npm run preview -- --port 4175",
+    url: "http://127.0.0.1:4175/tiny-rex/",
     reuseExistingServer: !process.env.CI,
   },
 });
+

@@ -33,7 +33,7 @@ def terrain(T):
         d = d + (n2 - 0.5) * wob
         return 1 - smoothstep(width * 0.5 - 0.6, width * 0.5 + 0.6, d)
 
-    clearing = blob(31, 35, 9.0, 6.8, 0.5)
+    clearing = blob(31, 35, 6.6, 4.8, 0.5)
     path_east = path([(37, 36), (46, 37.5), (56, 34), (66, 31.5), (84, 30)], 4.2)
     path_south = path([(26, 40), (23.5, 48), (27, 58), (31, 70), (33, 84)], 3.8)
     path_creek = path([(33, 29), (36, 27.5)], 3.0)

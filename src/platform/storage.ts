@@ -1,4 +1,4 @@
-import type { Result } from "../game/types";
+import type { Result } from "./historical-result";
 import { validateProfile, validateProgress } from "./validation";
 export interface Profile {
   id: string;

@@ -124,7 +124,7 @@ def lathe(radius, z, sides=12, center=(0, 0, 0), wobble=None):
     r = np.asarray(radius, float)[:, None]
     if wobble is not None:
         r = r * (1 + wobble)
-    V = np.stack([r * np.cos(a)[None], r * np.sin(a)[None], np.broadcast_to(np.asarray(z, float)[:, None], r.shape)], -1)
+    V = np.stack([r * np.cos(a)[None], r * np.sin(a)[None], np.broadcast_to(np.asarray(z, float)[:, None], (len(z), sides))], -1)
     V = V + np.asarray(center, float)
     return V[None], grid_quads(1, len(z), sides, wrap=True)
 

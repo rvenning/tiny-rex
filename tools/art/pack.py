@@ -95,7 +95,7 @@ def pack(manifest_path, out_base, quality=88):
                 **({"meta": f["meta"]} if "meta" in f else {}),
             }
         textures.append(
-            {"image": name, "format": "RGBA8888", "size": {"w": PAGE, "h": used_h}, "scale": 1, "frames": fr}
+            {"image": name, "format": "RGBA8888", "size": {"w": PAGE, "h": used_h}, "scale": 1, "frames": [{"filename": key, **frame} for key, frame in fr.items()]}
         )
     out = {"textures": textures, "meta": {**data.get("meta", {}), "decodedBytes": total_px * 4}}
     json.dump(out, open(out_base + ".json", "w"), separators=(",", ":"))

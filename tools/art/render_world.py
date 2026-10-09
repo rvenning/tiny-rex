@@ -10,6 +10,11 @@ import json
 import math
 import os
 import sys
+import importlib
+import pkgutil
+import random
+import zlib
+import shutil
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -19,6 +24,44 @@ from common import *  # noqa: E402,F401
 
 SURF = ["grass", "dirt", "moss", "rock", "mud", "gravel", "sand", "basalt", "lava", "ash"]
 TILE = 1024
+
+
+def add_prop_geometry(scene, records, center=None):
+    """Share variant meshes; bake ground clutter and cast tall-prop shadows.
+
+    Tall foliage remains a depth-sorted sprite in the game. Its geometry is
+    camera-invisible here so walking behind a tree is still possible.
+    """
+    import kit
+    registry = {}
+    for module in pkgutil.iter_modules(kit.__path__):
+        if not module.name.startswith("_"):
+            registry.update(getattr(importlib.import_module("kit." + module.name), "PROPS", {}))
+    meshes = {}
+    used = 0
+    for record in records:
+        name = record["n"]
+        spec = registry.get(name)
+        if spec is None:
+            continue
+        if center and math.hypot(record["x"] - center[0], record["y"] - center[1]) > 32:
+            continue
+        variant = record["v"] % spec.variants
+        key = (name, variant)
+        if key not in meshes:
+            rng = random.Random(zlib.crc32(f"{name}:{variant}".encode()))
+            obj = join_all(spec.build(rng), name=f"source-{name}-{variant}")
+            meshes[key] = obj.data
+            bpy.data.objects.remove(obj, do_unlink=True)
+        obj = bpy.data.objects.new(f"ground-{used}-{name}", meshes[key])
+        scene.collection.objects.link(obj)
+        bx, by = b_xy(record["x"], record["y"])
+        obj.location = (bx, by, record["z"])
+        obj.scale = (record["s"],) * 3
+        obj.visible_camera = bool(record["b"])
+        obj.visible_shadow = True
+        used += 1
+    print(f"Ground clutter/shadows: {used} instances, {len(meshes)} shared meshes", flush=True)
 
 
 # ----------------------------------------------------------------------------- mesh
@@ -455,6 +498,11 @@ def main():
     ap.add_argument("--size", default="1448,1086")
     ap.add_argument("--name", default="test")
     ap.add_argument("--samples", type=int, default=64)
+    ap.add_argument("--props", action="store_true")
+    ap.add_argument("--all", action="store_true")
+    ap.add_argument("--publish", default="")
+    ap.add_argument("--pixel-scale", type=float, default=1.0)
+    ap.add_argument("--tile-prefix", default="t")
     a = ap.parse_args(args_after_dashes())
     W = load_world(a.world)
     sc = reset_scene()
@@ -488,10 +536,15 @@ def main():
         sc.collection.objects.link(wob)
         wob.data.materials.append(build_water_material())
     for f in W["props"].get("features", []):
-        if f["kind"] == "waterfall":
+        if f.get("kind") == "waterfall":
             build_waterfall(sc, f)
     setup_render(sc, TILE, TILE, samples=a.samples, transparent=False)
+    pixels = max(128, round(TILE * a.pixel_scale))
+    sc.render.resolution_x = sc.render.resolution_y = pixels
     setup_lighting(sc)
+    if a.props:
+        center = tuple(float(v) for v in a.center.split(",")) if a.center else None
+        add_prop_geometry(sc, W["props"]["props"], center)
     if a.center:
         cx, cy = [float(v) for v in a.center.split(",")]
         w, h = [int(v) for v in a.size.split(",")]
@@ -501,7 +554,15 @@ def main():
         make_camera(sc, target=(tx, ty, 0), ortho_width_px=w, w=w, h=h)
         render_to(sc, os.path.join(a.out, a.name + ".png"))
         return
-    for tl in a.tiles.split(";"):
+    tiles = a.tiles.split(";")
+    if a.all:
+        width = max(c[0] for c in corners) - ox
+        height = max(c[1] for c in corners) - oy
+        px, py = proj(31, 35, 0)
+        coords = [(tx, ty) for ty in range(math.ceil(height / TILE)) for tx in range(math.ceil(width / TILE))]
+        coords.sort(key=lambda t: math.hypot(ox + (t[0] + .5) * TILE - px, oy + (t[1] + .5) * TILE - py))
+        tiles = [f"{x},{y}" for x, y in coords]
+    for tl in tiles:
         if not tl:
             continue
         tx, ty = [int(v) for v in tl.split(",")]
@@ -509,8 +570,23 @@ def main():
         gx, gy = tile_cam_target(ox, oy, cx, cy)
         for o in [o for o in sc.objects if o.type == "CAMERA"]:
             bpy.data.objects.remove(o)
-        make_camera(sc, target=(gx, gy, 0), ortho_width_px=TILE, w=TILE, h=TILE)
-        render_to(sc, os.path.join(a.out, f"t_{tx}_{ty}.png"))
+        make_camera(sc, target=(gx, gy, 0), ortho_width_px=TILE, w=pixels, h=pixels)
+        path = os.path.join(a.out, f"{a.tile_prefix}_{tx}_{ty}.png")
+        if not os.path.exists(path):
+            render_to(sc, path)
+        if a.publish:
+            dest = os.path.join(a.publish, "ground")
+            os.makedirs(dest, exist_ok=True)
+            shutil.copy2(path, os.path.join(dest, os.path.basename(path)))
+            mp = os.path.join(a.publish, "world.json")
+            meta = json.load(open(mp))
+            meta["canvas"] = json.load(open(os.path.join(a.out, "canvas.json")))
+            meta["tileSize"] = TILE
+            meta["tiles"] = sorted([dict(tx=int(p.split("_")[1]), ty=int(p.split("_")[2].split(".")[0]), file=p) for p in os.listdir(dest) if p.startswith(a.tile_prefix + "_") and p.endswith(".png")], key=lambda t: (t["ty"], t["tx"]))
+            tmp = mp + ".tmp"
+            json.dump(meta, open(tmp, "w"), separators=(",", ":"))
+            os.replace(tmp, mp)
+            print(f"Published {len(meta['tiles'])} ground tiles", flush=True)
 
 
 main()

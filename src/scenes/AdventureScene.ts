@@ -1,13 +1,13 @@
 import * as Phaser from "phaser";
 import { Adventure, idleInput, type Actor, type AdventureEvent } from "../adventure/sim";
-import { DINOS, DISCOVERIES, REGIONS, byRegion, type Point } from "../adventure/data";
+import { DINOS, DISCOVERIES, GATES, PORTALS, REGIONS, byRegion, type Point } from "../adventure/data";
 import { AdventureStore, type AdventureSave } from "../adventure/save";
 import type { Audio } from "../platform/audio";
 import { Hud, type ActionKey, type MapMarker } from "../ui/hud";
 import { proj, screenDirToGround } from "../world/projection";
 import type { World } from "../world/world";
 import { ActorView } from "./adventure/actor-view";
-import { loadCreature, loadProps } from "./adventure/assets";
+import { hasCreature, loadCreature, loadProps, unloadCreature } from "./adventure/assets";
 import { Fx, makeTextures } from "./adventure/fx";
 import { GroundLayer, PropLayer } from "./adventure/world-view";
 
@@ -67,6 +67,9 @@ export class AdventureScene extends Phaser.Scene {
   private flashEl?: HTMLElement;
   private lastTier = -1;
   private shown = new Set<number>();
+  private creatureStreamTimer = 0;
+  private clearedProps = new Set<string>();
+  private celebratedCatch = false;
   constructor() {
     super("Adventure");
   }
@@ -88,12 +91,15 @@ export class AdventureScene extends Phaser.Scene {
     this.lastSave = 0;
     this.hitStop = 0;
     this.lastTier = -1;
+    this.creatureStreamTimer = 0;
+    this.clearedProps.clear();
+    this.celebratedCatch = false;
     this.cameras.main.setBackgroundColor("#1b3322").setRoundPixels(false);
     makeTextures(this);
     this.fx = new Fx(this);
     this.fx.budget = this.reduced ? 70 : 170;
     this.cues = this.add.graphics().setDepth(-9e5);
-    this.keys = this.input.keyboard!.addKeys("W,A,S,D,UP,DOWN,LEFT,RIGHT,J,K,L,E,SPACE,ESC,ENTER") as Record<string, Phaser.Input.Keyboard.Key>;
+    this.keys = this.input.keyboard!.addKeys("W,A,S,D,UP,DOWN,LEFT,RIGHT,J,K,L,E,SPACE,ESC,ENTER,SHIFT") as Record<string, Phaser.Input.Keyboard.Key>;
     const touch = matchMedia("(pointer: coarse)").matches || "ontouchstart" in window;
     this.hud = new Hud(
       document.getElementById("ui")!,
@@ -124,7 +130,7 @@ export class AdventureScene extends Phaser.Scene {
     void this.boot();
   }
   private async boot() {
-    const ids = new Set<string>(this.sim.actors.map(atlasFor));
+    const ids = new Set<string>(this.sim.actors.filter(a => dist(a, this.sim.player) < 34).map(atlasFor));
     const first = this.playerAtlasId();
     ids.add(first);
     await Promise.all([loadProps(this), ...[...ids].map((id) => loadCreature(this, id))]);
@@ -137,6 +143,7 @@ export class AdventureScene extends Phaser.Scene {
     }
     this.layoutCamera();
     this.snapCamera();
+    this.cameras.main.preRender();
     this.ground.update(this.cameras.main.worldView, true);
     await new Promise<void>((r) => {
       if (this.load.isLoading()) this.load.once(Phaser.Loader.Events.COMPLETE, () => r());
@@ -144,7 +151,7 @@ export class AdventureScene extends Phaser.Scene {
     });
     this.loadingEl?.remove();
     this.ready = true;
-    this.hud.toast("Stalk a beetle · creep slowly so it doesn't notice you");
+    this.hud.toast(this.hud.root.classList.contains("touch") ? "Stalk a beetle · move the stick gently to creep" : "Stalk a beetle · hold Shift to creep, J to bite", "hint");
   }
   private playerAtlasId() {
     const d = this.sim.dino;
@@ -162,8 +169,8 @@ export class AdventureScene extends Phaser.Scene {
     });
     const down = (p: Phaser.Input.Pointer) => {
       const e = p.event as PointerEvent;
-      const cx = e.clientX,
-        cy = e.clientY;
+      const cx = p.x * innerWidth / this.scale.width,
+        cy = p.y * innerHeight / this.scale.height;
       if (this.stickPointer !== null || cx > innerWidth * 0.55 || !this.ready) return;
       if (e.pointerType === "mouse" && e.button !== 0) return;
       this.stickPointer = p.id;
@@ -173,9 +180,8 @@ export class AdventureScene extends Phaser.Scene {
     };
     const move = (p: Phaser.Input.Pointer) => {
       if (this.stickPointer !== p.id) return;
-      const e = p.event as PointerEvent;
-      const dx = e.clientX - this.stickOrigin.x,
-        dy = e.clientY - this.stickOrigin.y;
+      const dx = p.x * innerWidth / this.scale.width - this.stickOrigin.x,
+        dy = p.y * innerHeight / this.scale.height - this.stickOrigin.y;
       const len = Math.hypot(dx, dy),
         max = 62;
       if (len < 8) {
@@ -307,8 +313,8 @@ export class AdventureScene extends Phaser.Scene {
       input.move = { x: this.stick.x * this.stick.mag, y: this.stick.y * this.stick.mag };
     } else if (kx || ky) {
       const g = screenDirToGround(kx, ky);
-      // holding Shift or Ctrl creeps (stalking); otherwise run
-      const creep = this.input.keyboard!.checkDown(this.input.keyboard!.addKey("SHIFT"), 0) ? 0.4 : 1;
+      // Holding Shift creeps for stalking; otherwise run.
+      const creep = this.keys.SHIFT.isDown ? 0.4 : 1;
       input.move = { x: g.x * creep, y: g.y * creep };
     }
     input.bite = this.held.bite || this.keys.J.isDown;
@@ -332,6 +338,7 @@ export class AdventureScene extends Phaser.Scene {
     this.ground.update(view);
     this.props.update(view);
     this.draw(dt);
+    this.streamCreatures(dt);
     this.fx.update(dt);
     this.updateHud(dt);
     this.updateFloaters(dt);
@@ -342,26 +349,45 @@ export class AdventureScene extends Phaser.Scene {
     const id = this.playerAtlasId();
     const ok = await loadCreature(this, id);
     if (ok || first) this.swapPlayer(id);
-    // warm the next stage so the growth moment never stalls
-    if (this.sim.dino === "rex" && this.sim.tier < 3) void loadCreature(this, `rex_${this.sim.tier + 1}`);
+  }
+  private streamCreatures(dt: number) {
+    this.creatureStreamTimer -= dt;
+    if (this.creatureStreamTimer > 0) return;
+    this.creatureStreamTimer = 0.8;
+    for (const gate of GATES) {
+      if (!gate.prop || !this.sim.save.gates.includes(gate.id) || this.clearedProps.has(gate.id)) continue;
+      this.props.clearObstruction(gate.prop, gate.x, gate.y);
+      this.clearedProps.add(gate.id);
+    }
+    const nearby = new Set(this.sim.actors.filter(a => a.state !== "dead" && dist(a, this.sim.player) < 52).map(atlasFor));
+    nearby.add(this.playerAtlasId());
+    for (const id of nearby) void loadCreature(this, id);
+    const active = new Set([...this.views.values()].map(v => v.atlasId));
+    active.add(this.playerAtlas);
+    for (const id of new Set(this.sim.actors.map(atlasFor))) {
+      if (!nearby.has(id) && !active.has(id) && hasCreature(this, id)) unloadCreature(this, id);
+    }
   }
   private swapPlayer(id: string) {
+    const previous = this.playerAtlas;
     this.player?.destroy();
     this.playerAtlas = id;
     const st = this.sim.stats;
     this.player = new ActorView(this, id, DINOS[this.sim.dino].stages[this.sim.tier].sprite, st.r, 0xcfe7b0);
+    if (previous && previous !== id && !this.sim.actors.some((a) => atlasFor(a) === previous)) unloadCreature(this, previous);
   }
   private poseFor(a: Actor): string {
     switch (a.state) {
       case "windup":
         return "windup";
       case "strike":
-        return "strike";
+          return "bite";
       case "flee":
         return "run";
       case "stagger":
-      case "recover":
         return "idle";
+        case "recover":
+          return "recover";
       default:
         return a.speedNow > 0.4 ? "run" : a.spec.id === "dragonfly" ? "hover" : "idle";
     }
@@ -547,6 +573,10 @@ export class AdventureScene extends Phaser.Scene {
         audio.play("eat", this.sim.tier + 1);
         burst("fx-leaf", calm ? 3 : 8, 90, { life: 0.8, g: 140, s0: 0.9, s1: 0.5, tint: 0xb7ee62 });
         if (e.reward) this.floater(`+${e.reward}`, q.x, q.y - 40, "#ffe08a");
+        if (!this.celebratedCatch && e.reward) {
+          this.celebratedCatch = true;
+          this.hud.toast(`First catch! · +${e.reward} growth`, "catch");
+        }
         break;
       case "hurt":
         audio.play("hurt");
@@ -584,6 +614,7 @@ export class AdventureScene extends Phaser.Scene {
       }
       case "notice":
         audio.play("nope");
+        if (e.text) this.hud.toast(e.text, "hint");
         break;
       case "bounce":
         audio.play("nope");
@@ -607,7 +638,7 @@ export class AdventureScene extends Phaser.Scene {
       case "discovery":
         audio.play("grow", 1);
         burst("fx-spark", calm ? 4 : 12, 110, { life: 0.9, g: 30, blend: Phaser.BlendModes.ADD });
-        if (e.text) this.hud.toast(e.text + (e.reward ? ` · +${e.reward} growth` : ""));
+        if (e.text) this.hud.toast(e.text + (e.reward ? ` · +${e.reward} growth` : ""), e.reward ? "reward" : "study");
         this.persist();
         break;
       case "nest":
@@ -684,7 +715,7 @@ export class AdventureScene extends Phaser.Scene {
       }
       const q = proj(a.x, a.y, this.world.grid.height(a.x, a.y) + a.spec.r * 2.4 + 0.8);
       const c = this.toCss(q.x, q.y);
-      this.hud.callout(id, a.state === "recover" ? "Now! Bite" : "Lunge · punish the recovery", c.x, c.y, "danger");
+      this.hud.callout(id, "Lunge · punish the recovery", c.x, c.y, "danger");
     }
     // vulnerable window prompt
     for (const a of s.actors) {
@@ -693,6 +724,13 @@ export class AdventureScene extends Phaser.Scene {
         const c = this.toCss(q.x, q.y);
         this.hud.callout("rec" + a.id, "Vulnerable · bite now", c.x, c.y, "good");
       }
+    }
+    for (const gate of GATES) {
+      if (s.save.gates.includes(gate.id) || dist(gate, s.player) > 10) continue;
+      const q = proj(gate.x, gate.y, this.world.grid.height(gate.x, gate.y) + 1.2);
+      const c = this.toCss(q.x, q.y);
+      const requirement = s.tier < gate.requiredStage ? `${["Hatchling", "Juvenile", "Hunter", "Apex"][gate.requiredStage]} needed` : gate.id === "trike-rubble" ? "Trike · charge the rubble" : gate.id === "raptor-roots" ? "Raptor root passage" : gate.kind === "breakable" ? "Bite to clear the route" : "Cross the shallow ford";
+      this.hud.callout("gate-" + gate.id, `${gate.name} · ${requirement}`, c.x, c.y, "good");
     }
     this.hud.endCallouts();
     this.hud.update(
@@ -707,7 +745,7 @@ export class AdventureScene extends Phaser.Scene {
         cooldown: { bite: cd(s.biteCooldown, spec.biteCd), dodge: cd(s.dodgeCooldown, spec.dodgeCd), skill: cd(s.skillCooldown, spec.skillCd) },
         skillName: spec.skillName,
         skillLocked: s.tier < spec.skillStage,
-        interact: s.nearNest ? "Rest at the nest · Enter" : null,
+        interact: s.interactLabel ? `${s.interactLabel} · Enter` : null,
         portrait: () => this.portrait(),
       },
       dt,
@@ -719,27 +757,29 @@ export class AdventureScene extends Phaser.Scene {
       for (const a of s.actors) if (a.state !== "dead" && a.spec.role !== "prey" && a.spec.role !== "armour" && dist(a, s.player) < 40) mk.push({ x: a.x, y: a.y, kind: "threat" });
       for (const r of REGIONS) if (r.built) mk.push({ x: r.nest.x, y: r.nest.y, kind: "nest" });
       for (const d of DISCOVERIES) if (d.kind !== "forage" && !s.save.discoveries.includes(d.id) && dist(d, s.player) < 30) mk.push({ x: d.x, y: d.y, kind: "find" });
+      for (const portal of PORTALS) {
+        if (dist(portal, s.player) < 40) mk.push({ x: portal.x, y: portal.y, kind: "goal" });
+        if (portal.bidirectional && dist(portal.to, s.player) < 40) mk.push({ x: portal.to.x, y: portal.to.y, kind: "goal" });
+      }
       this.hud.drawMap(s.player.x, s.player.y, mk);
     }
   }
   private portraitCache?: { key: string; canvas: HTMLCanvasElement };
+  private portraitImages = new Map<string, HTMLImageElement>();
   private portrait(): HTMLCanvasElement | null {
     const key = this.playerAtlasId();
     if (this.portraitCache?.key === key) return null;
-    if (!this.textures.exists("cr-" + key)) return null;
-    const tex = this.textures.get("cr-" + key);
-    const frameName = `${key}/idle/1/0`;
-    if (!tex.has(frameName)) return null;
-    const f = tex.get(frameName);
-    const src = f.source.image as HTMLImageElement | HTMLCanvasElement;
+    let src = this.portraitImages.get(key);
+    if (!src) {
+      src = new Image();
+      src.src = import.meta.env.BASE_URL + `art/portraits/${key}.webp`;
+      this.portraitImages.set(key, src);
+    }
+    if (!src.complete || !src.naturalWidth) return null;
     const c = document.createElement("canvas");
     c.width = c.height = 120;
     const ctx = c.getContext("2d")!;
-    // head crop: top-right third of the body silhouette, scaled to fill the badge
-    const w = f.cutWidth,
-      h = f.cutHeight;
-    const side = Math.min(w, h) * 0.62;
-    ctx.drawImage(src, f.cutX + w * 0.5 - side * 0.35, f.cutY + h * 0.02, side, side, 0, 0, 120, 120);
+    ctx.drawImage(src, 0, 0, 120, 120);
     this.portraitCache = { key, canvas: c };
     return c;
   }
@@ -759,12 +799,12 @@ export class AdventureScene extends Phaser.Scene {
     this.held = { bite: false, dodge: false, skill: false };
     this.input.keyboard?.resetKeys();
     this.persist();
-    this.scene.pause();
+    this.game.scene.pause("Adventure");
     window.dispatchEvent(new Event("rex-adventure-pause"));
   }
   resumeAdventure() {
     this.input.keyboard?.resetKeys();
-    this.scene.resume();
+    this.game.scene.resume("Adventure");
   }
   diagnostics() {
     const cam = this.cameras.main;

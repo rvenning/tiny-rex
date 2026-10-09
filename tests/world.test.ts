@@ -1,17 +1,57 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
-import { gunzipSync } from "node:zlib";
-import { parseWorld, type WorldMeta } from "../src/world/world";
+import { gunzipSync, gzipSync } from "node:zlib";
+import {
+  parseWorld,
+  decodeWorldBytes,
+  type WorldMeta,
+} from "../src/world/world";
 import { proj, unproj } from "../src/world/projection";
 
 const load = () => {
-  const meta = JSON.parse(readFileSync("public/world/world.json", "utf8")) as WorldMeta;
-  return parseWorld(meta, new Uint8Array(gunzipSync(readFileSync("public/world/world.bin.gz"))));
+  const meta = JSON.parse(
+    readFileSync("public/world/world.json", "utf8"),
+  ) as WorldMeta;
+  return parseWorld(
+    meta,
+    new Uint8Array(gunzipSync(readFileSync("public/world/world.bin.gz"))),
+  );
 };
+
+describe("World response decoding", () => {
+  it("accepts an HTTP-decompressed body without trying to gunzip it twice", async () => {
+    const raw = Uint8Array.from([1, 0, 4, 0, 7, 3, 5, 9]);
+    expect(await decodeWorldBytes(raw.buffer)).toEqual(raw);
+  });
+  it("decodes opaque gzip bytes from a static host", async () => {
+    const raw = Uint8Array.from([1, 0, 4, 0, 7, 3, 5, 9]);
+    const packed = Uint8Array.from(gzipSync(raw));
+    expect(await decodeWorldBytes(packed.buffer)).toEqual(raw);
+  });
+  it("rejects truncated collision data rather than quietly making the world unwalkable", () => {
+    const meta = {
+      bounds: [0, 0, 2, 2],
+      cell: 1,
+      nx: 2,
+      ny: 2,
+      surf: ["grass"],
+      version: 2,
+      pois: {},
+      features: [],
+      props: [],
+      water: [],
+    } as WorldMeta;
+    expect(() => parseWorld(meta, new Uint8Array(4))).toThrow("expected 16");
+  });
+});
 
 describe("projection", () => {
   it("round-trips ground points including height", () => {
-    for (const [x, y, z] of [[3, 4, 0], [30, 12, 1.5], [-5, 40, 0.3]]) {
+    for (const [x, y, z] of [
+      [3, 4, 0],
+      [30, 12, 1.5],
+      [-5, 40, 0.3],
+    ]) {
       const p = proj(x, y, z);
       const q = unproj(p.x, p.y, z);
       expect(q.x).toBeCloseTo(x, 6);
@@ -19,9 +59,14 @@ describe("projection", () => {
     }
   });
   it("+gx runs down-right, +gy down-left, +gz up", () => {
-    const o = proj(0, 0), a = proj(1, 0), b = proj(0, 1), c = proj(0, 0, 1);
-    expect(a.x).toBeGreaterThan(o.x); expect(a.y).toBeGreaterThan(o.y);
-    expect(b.x).toBeLessThan(o.x); expect(b.y).toBeGreaterThan(o.y);
+    const o = proj(0, 0),
+      a = proj(1, 0),
+      b = proj(0, 1),
+      c = proj(0, 0, 1);
+    expect(a.x).toBeGreaterThan(o.x);
+    expect(a.y).toBeGreaterThan(o.y);
+    expect(b.x).toBeLessThan(o.x);
+    expect(b.y).toBeGreaterThan(o.y);
     expect(c.y).toBeLessThan(o.y);
   });
 });
@@ -29,14 +74,28 @@ describe("projection", () => {
 describe("Fern Hollow world data", () => {
   const w = load();
   const reach = (from: [number, number], r = 0.45) => {
-    const g = w.grid, seen = new Set<string>(), q: [number, number][] = [];
-    const key = (x: number, y: number) => `${Math.round(x / 0.5)},${Math.round(y / 0.5)}`;
-    q.push(from); seen.add(key(...from));
+    const g = w.grid,
+      seen = new Set<string>(),
+      q: [number, number][] = [];
+    const key = (x: number, y: number) =>
+      `${Math.round(x / 0.5)},${Math.round(y / 0.5)}`;
+    q.push(from);
+    seen.add(key(...from));
     while (q.length) {
       const [x, y] = q.pop()!;
-      for (const [dx, dy] of [[0.5, 0], [-0.5, 0], [0, 0.5], [0, -0.5]]) {
-        const nx = x + dx, ny = y + dy, k = key(nx, ny);
-        if (!seen.has(k) && g.fits(nx, ny, r)) { seen.add(k); q.push([nx, ny]); }
+      for (const [dx, dy] of [
+        [0.5, 0],
+        [-0.5, 0],
+        [0, 0.5],
+        [0, -0.5],
+      ]) {
+        const nx = x + dx,
+          ny = y + dy,
+          k = key(nx, ny);
+        if (!seen.has(k) && g.fits(nx, ny, r)) {
+          seen.add(k);
+          q.push([nx, ny]);
+        }
       }
     }
     // a point counts as reachable when a walkable, reached cell lies within 2.2 units (nests are solid)
@@ -49,7 +108,13 @@ describe("Fern Hollow world data", () => {
   };
   it("every discovery point is reachable from the start nest by a hatchling", () => {
     const can = reach(w.meta.pois.start_nest);
-    for (const k of ["egg_nest", "ford", "fossil_shelf", "exit_east", "cave_mouth"]) {
+    for (const k of [
+      "egg_nest",
+      "ford",
+      "fossil_shelf",
+      "exit_east",
+      "cave_mouth",
+    ]) {
       expect(can(w.meta.pois[k]), k).toBe(true);
     }
   });

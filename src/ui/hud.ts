@@ -41,7 +41,10 @@ export class Hud {
     return this.root.querySelector<T>(sel)!;
   }
   private sig = "";
+  private portraitSource?: HTMLCanvasElement;
   private toastTimer = 0;
+  private toastPriority = 0;
+  private toastQueue: { text: string; kind: string }[] = [];
   private callouts = new Map<string, HTMLElement>();
   private map?: { base: HTMLCanvasElement; s: number; ox: number; oy: number };
   private mapCtx: CanvasRenderingContext2D;
@@ -75,11 +78,14 @@ export class Hud {
       </div>
       <button class="interact" data-interact></button>`;
     parent.append(this.root);
-    this.mapCtx = this.q<HTMLCanvasElement>(".minimap canvas").getContext("2d")!;
+    this.mapCtx =
+      this.q<HTMLCanvasElement>(".minimap canvas").getContext("2d")!;
     this.q("[data-pause]").onclick = () => handlers.pause();
     this.q("[data-journal]").onclick = () => handlers.journal();
     this.q("[data-interact]").onclick = () => handlers.interact();
-    for (const b of this.root.querySelectorAll<HTMLButtonElement>("[data-act]")) {
+    for (const b of this.root.querySelectorAll<HTMLButtonElement>(
+      "[data-act]",
+    )) {
       const key = b.dataset.act as ActionKey;
       b.onpointerdown = (e) => {
         e.preventDefault();
@@ -112,30 +118,71 @@ export class Hud {
   }
   update(s: HudState, dt: number) {
     const hearts = [0, 1, 2].map((i) => heart(s.hp - i, i)).join("");
-    const sig = JSON.stringify([s.dinoName, s.stage, Math.ceil(s.hp * 8), s.growth, s.region, s.objective, s.skillName, s.skillLocked, s.interact]);
+    const sig = JSON.stringify([
+      s.dinoName,
+      s.stage,
+      Math.ceil(s.hp * 8),
+      s.growth,
+      s.region,
+      s.objective,
+      s.skillName,
+      s.skillLocked,
+      s.interact,
+    ]);
     if (sig !== this.sig) {
       this.sig = sig;
-      this.q(".stage").textContent = s.stage >= 3 && !s.growth ? s.stageName + " " + s.dinoName : s.stageName + " " + s.dinoName;
+      this.q(".stage").textContent =
+        s.stage >= 3 && !s.growth
+          ? s.stageName + " " + s.dinoName
+          : s.stageName + " " + s.dinoName;
       this.q(".hearts").innerHTML = hearts;
-      this.q(".hearts").setAttribute("aria-label", `${s.hp.toFixed(1)} of 3 health`);
+      this.q(".hearts").setAttribute(
+        "aria-label",
+        `${s.hp.toFixed(1)} of 3 health`,
+      );
       const g = s.growth;
-      this.q(".growth-label").textContent = g ? (g.blocked ? `Defeat the ${g.blocked}` : `Growth ${g.have} / ${g.need}`) : "Growth complete";
-      this.q<HTMLElement>(".growth-bar i").style.width = (g ? Math.min(100, (g.have / g.need) * 100) : 100) + "%";
+      this.q(".growth-label").textContent = g
+        ? g.blocked
+          ? `Defeat the ${g.blocked}`
+          : `Growth ${g.have} / ${g.need}`
+        : "Growth complete";
+      this.q<HTMLElement>(".growth-bar i").style.width =
+        (g ? Math.min(100, (g.have / g.need) * 100) : 100) + "%";
       this.q(".region-name").textContent = s.region;
       this.q(".objective span").textContent = s.objective;
-      this.q(".skill-name").textContent = s.skillLocked ? "Locked" : s.skillName;
-      this.q(".act[data-act=skill] .ico").innerHTML = s.skillLocked ? ICONS.lock : ICONS[s.skillName.toLowerCase()] ?? ICONS.roar;
-      this.q(".act[data-act=skill]").classList.toggle("locked", s.skillLocked);
+      this.q(".skill-name").textContent = s.skillLocked
+        ? "Locked"
+        : s.skillName;
+      this.q(".act[data-act=skill] .ico").innerHTML = s.skillLocked
+        ? ICONS.lock
+        : (ICONS[s.skillName.toLowerCase()] ?? ICONS.roar);
+      const biteButton = this.q<HTMLButtonElement>(".act[data-act=bite]");
+      biteButton.querySelector("b")!.textContent =
+        s.dinoName === "Triceratops" ? "Graze" : "Bite";
+      biteButton.setAttribute(
+        "aria-label",
+        s.dinoName === "Triceratops" ? "Graze or defend with horns" : "Bite",
+      );
+      const skillButton = this.q<HTMLButtonElement>(".act[data-act=skill]");
+      skillButton.classList.toggle("locked", s.skillLocked);
+      skillButton.disabled = s.skillLocked;
+      skillButton.setAttribute(
+        "aria-label",
+        s.skillLocked ? "Species skill unlocks as you grow" : s.skillName,
+      );
       const it = this.q<HTMLButtonElement>("[data-interact]");
       it.style.display = s.interact ? "block" : "none";
-      it.textContent = s.interact ?? "";
+      it.textContent = this.root.classList.contains("touch")
+        ? (s.interact ?? "").replace(/ · Enter$/, "")
+        : (s.interact ?? "");
+    }
       const p = s.portrait?.();
-      if (p) {
+      if (p && p !== this.portraitSource) {
+        this.portraitSource = p;
         const c = this.q<HTMLCanvasElement>(".portrait").getContext("2d")!;
         c.clearRect(0, 0, 120, 120);
         c.drawImage(p, 0, 0, 120, 120);
       }
-    }
     for (const k of ["bite", "dodge", "skill"] as const) {
       const b = this.q<HTMLElement>(`.act[data-act=${k}]`);
       b.style.setProperty("--cd", String(s.cooldown[k]));
@@ -143,10 +190,23 @@ export class Hud {
     }
     if (this.toastTimer > 0) {
       this.toastTimer -= dt;
-      if (this.toastTimer <= 0) this.q(".toast").classList.remove("show");
+      if (this.toastTimer <= 0) {
+        this.q(".toast").classList.remove("show");
+        const next = this.toastQueue.shift();
+        if (next) this.toast(next.text, next.kind);
+      }
     }
   }
   toast(text: string, kind = "") {
+    const priority = kind === "grow" || kind === "bad" ? 3 : ["catch", "hint", "reward"].includes(kind) ? 2 : kind === "study" ? 0 : 1;
+    if (this.toastTimer > 0 && priority < this.toastPriority) {
+      if (!this.toastQueue.some(t => t.text === text)) {
+        this.toastQueue.push({ text, kind });
+        if (this.toastQueue.length > 3) this.toastQueue.shift();
+      }
+      return;
+    }
+    this.toastPriority = priority;
     const t = this.q(".toast");
     t.textContent = text;
     t.className = "toast show " + kind;
@@ -190,7 +250,13 @@ export class Hud {
       for (let gx = grid.x0; gx < grid.x0 + grid.nx * grid.cell; gx += step) {
         const f = grid.flagsAt(gx, gy);
         const wet = (f & 2) !== 0;
-        const col = wet ? ((f & 4) !== 0 ? colors.deep : colors.shallow) : (f & 1) !== 0 ? colors[grid.surface(gx, gy)] ?? colors.grass : colors.forest;
+        const col = wet
+          ? (f & 4) !== 0
+            ? colors.deep
+            : colors.shallow
+          : (f & 1) !== 0
+            ? (colors[grid.surface(gx, gy)] ?? colors.grass)
+            : colors.forest;
         c.fillStyle = col;
         const rx = (gx - gy) * Math.SQRT1_2 * s + ox,
           ry = (gx + gy) * Math.SQRT1_2 * s;
@@ -218,7 +284,14 @@ export class Hud {
       const mx = cx + ((k.x - k.y) * Math.SQRT1_2 * m.s + m.ox - rx),
         my = cx + ((k.x + k.y) * Math.SQRT1_2 * m.s - ry);
       if (k.kind === "player") continue;
-      c.fillStyle = k.kind === "threat" ? "#ff5a4a" : k.kind === "goal" ? "#ffb347" : k.kind === "nest" ? "#ffe9a8" : "#ffd86b";
+      c.fillStyle =
+        k.kind === "threat"
+          ? "#ff5a4a"
+          : k.kind === "goal"
+            ? "#ffb347"
+            : k.kind === "nest"
+              ? "#ffe9a8"
+              : "#ffd86b";
       c.strokeStyle = "#1a1a1a";
       c.lineWidth = 1.5;
       c.beginPath();
@@ -236,7 +309,11 @@ export class Hud {
     c.restore();
     // player arrow (always centred, pointing along its screen heading)
     const player = markers.find((k) => k.kind === "player");
-    const a = Math.atan2(Math.sin(player?.face ?? 0) + Math.cos(player?.face ?? 0), Math.cos(player?.face ?? 0) - Math.sin(player?.face ?? 0)) - 0; // heading in rotated map space
+    const a =
+      Math.atan2(
+        Math.sin(player?.face ?? 0) + Math.cos(player?.face ?? 0),
+        Math.cos(player?.face ?? 0) - Math.sin(player?.face ?? 0),
+      ) - 0; // heading in rotated map space
     c.save();
     c.translate(cx, cx);
     c.rotate(a + Math.PI / 2);

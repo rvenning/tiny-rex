@@ -27,6 +27,10 @@ export class MenuScene extends Phaser.Scene {
       const n = world.meta.pois.start_nest;
       this.rex = new ActorView(this, "rex_0", 1, 0.45, 0xcfe7b0);
       this.rex.update(0, n[0] + 2.2, n[1] + 1.2, world.grid.height(n[0] + 2.2, n[1] + 1.2), Math.PI / 4, "idle");
+      // Let the title become interactive only after its shared atlases finish.
+      // Stopping Menu earlier cancels its loader and strands Adventure's shared promises.
+      this.registry.set("ready", true);
+      window.dispatchEvent(new Event("rex-ready"));
     });
     this.events.once("shutdown", () => {
       this.alive = false;

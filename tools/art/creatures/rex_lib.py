@@ -175,7 +175,10 @@ class Tube:
         self.stations = stations
         self.attrs = attrs or {}
         self.dors = dors
-        self.ks = F(max(float(np.mean(seg)) * 0.35, 1e-4))
+        # A broad log-sum union inflated every short neck segment into a collar.
+        # Keep only a small blending radius; the Catmull sampled profile supplies
+        # the smoothness without stacked rings of overlapping volume.
+        self.ks = F(max(float(np.mean(seg)) * 0.055, 1e-4))
 
     def arc_of(self, p):
         d, s, *_ = self.eval(np.asarray(p, dtype=F)[None, :], local=True)
@@ -201,7 +204,11 @@ class Tube:
             rel = p[:, None, :] - c0[None]
             tu = (rel * dv[None]).sum(2) / L2[None]
             tc = np.clip(tu, 0, 1)
-            es = np.maximum(-tu, tu - 1) * Ls[None]
+            # Only the two ends of the whole tube have caps. Capping each
+            # sampling interval produced cream collar rings in the neck.
+            es = np.full_like(tu, -BIG)
+            es[:, 0] = -tu[:, 0] * Ls[0]
+            es[:, -1] = np.maximum(es[:, -1], (tu[:, -1] - 1) * Ls[-1])
             pq = rel - tc[..., None] * dv[None]
 
             def lerp(arr):
@@ -224,11 +231,12 @@ class Tube:
             g = k0 ** (1.0 - n) * np.sqrt(gx * gx + gy * gy)
             d2 = (k0 - 1.0) / np.maximum(g, 1e-6)
             piece = np.minimum(np.maximum(d2, es), 0) + np.sqrt(np.maximum(d2, 0) ** 2 + np.maximum(es, 0) ** 2)
-            j = np.argmin(piece, axis=1)
+            # Choose the nearest point on the continuous centreline. A union
+            # of independently capped pieces creates inflated segment joints.
+            j = np.argmin((pq * pq).sum(2), axis=1)
             rr = np.arange(len(p))
             pm = piece[rr, j]
-            ks = self.ks
-            out_d[i0:i0 + chunk] = pm - ks * np.log(np.exp(-np.minimum(piece - pm[:, None], 30 * ks) / ks).sum(1))
+            out_d[i0:i0 + chunk] = pm
             if local:
                 tj = tc[rr, j]
                 out_s[i0:i0 + chunk] = self.s[j] + tj * Ls[j]
@@ -1395,23 +1403,19 @@ def skin_material(rex):
     cellc = g.vor(vrest, 26.0, "F1", "Color")
     cellv = g.sep(cellc)[0]
     col = g.mix(g.mr(cellv, 0.0, 1.0, 0.0, 0.18), col, srgb("#16463F"), "MIX")
-    # ---- amber dorsal patches: whole scale cells along the midline, shoulders and hips
-    pc = g.vor(vrest, 13.0, "F1", "Color")
-    pr = g.sep(pc)[0]
-    pedge = g.vor(vrest, 13.0, "DISTANCE_TO_EDGE", "Distance")
-    # probability rises toward the dorsal midline
-    prob = g.mr(dors, 0.45, 0.97, 0.04, 0.8, "SMOOTHSTEP")
-    blot = g.noise(rest, 3.2, 2.0, 0.5)
-    prob = g.math("ADD", prob, g.mr(blot, 0.42, 0.62, -0.45, 0.2), clamp=True)
-    prob = g.math("MULTIPLY", prob, g.math("SUBTRACT", 1.0, g.math("MULTIPLY", face, 0.55)))
-    prob = g.math("MULTIPLY", prob, g.math("SUBTRACT", 1.0, limb))
-    patch = g.math("LESS_THAN", pr, prob)
-    patch = g.math("MULTIPLY", patch, g.mr(pedge, 0.03, 0.12, 0.0, 1.0))
-    patch = g.math("MAXIMUM", patch, g.mr(crest, 0.35, 0.8))
-    amber = g.mix(g.noise(rest, 9.0, 2.0, 0.5), srgb("#F2A124"), srgb("#D9701A"))
+    # ---- subdued painted dorsal gold, integrated into the hide.
+    # Broad irregular patches share the underlying fine scales. They have no
+    # independent raised mosaic bump or bright-orange cell outlines.
+    blot = g.noise(rest, 4.3, 3.0, 0.62, distort=0.18)
+    patch = g.mr(blot, 0.48, 0.69, 0.0, 0.78, "SMOOTHSTEP")
+    patch = g.math("MULTIPLY", patch, g.mr(dors, 0.35, 0.88, 0.0, 1.0, "SMOOTHSTEP"))
+    patch = g.math("MULTIPLY", patch, g.math("SUBTRACT", 1.0, g.math("MULTIPLY", face, 0.75)))
+    patch = g.math("MULTIPLY", patch, g.math("SUBTRACT", 1.0, limb))
+    patch = g.math("MAXIMUM", patch, g.mr(crest, 0.35, 0.8, 0.0, 0.62))
+    amber = g.mix(g.noise(rest, 9.0, 2.0, 0.5), srgb("#BA9149"), srgb("#9B783E"))
     col = g.mix(patch, col, amber)
     # ---- cream belly / throat / jaw
-    creamc = g.mix(g.noise(rest, 5.0, 2.0, 0.5), srgb("#F1E3B6"), srgb("#E3CA8C"))
+    creamc = g.mix(g.noise(rest, 5.0, 2.0, 0.5), srgb("#DCC997"), srgb("#C9AD72"))
     cr = g.mr(cream, 0.15, 0.85, 0.0, 1.0, "SMOOTHSTEP")
     col = g.mix(cr, col, creamc)
     # mouth / nostrils / scars
@@ -1426,23 +1430,21 @@ def skin_material(rex):
     # ---- surface: scales as bump (softer on the face and belly)
     sc_edge = g.vor(vrest, 26.0, "DISTANCE_TO_EDGE", "Distance")
     sc_h = g.mr(sc_edge, 0.0, 0.10, 0.0, 1.0, "SMOOTHSTEP")
-    big_edge = g.vor(vrest, 13.0, "DISTANCE_TO_EDGE", "Distance")
-    big_h = g.mr(big_edge, 0.0, 0.08, 0.0, 1.0, "SMOOTHSTEP")
-    height = g.math("ADD", g.math("MULTIPLY", sc_h, 0.6), g.math("MULTIPLY", big_h, g.math("MULTIPLY", patch, 0.8)))
+    height = sc_h
     soft = g.math("SUBTRACT", 1.0, g.math("ADD", g.math("MULTIPLY", face, 0.45), g.math("MULTIPLY", cr, 0.35)))
     bump = g.n("ShaderNodeBump")
-    g.put(bump.inputs["Strength"], g.math("MULTIPLY", soft, 0.32))
-    bump.inputs["Distance"].default_value = 0.01 * L / 4.2
+    g.put(bump.inputs["Strength"], g.math("MULTIPLY", soft, 0.14))
+    bump.inputs["Distance"].default_value = 0.004 * L / 4.2
     g.put(bump.inputs["Height"], height)
     bump2 = g.n("ShaderNodeBump")
     bump2.inputs["Strength"].default_value = 0.2
     bump2.inputs["Distance"].default_value = 0.02 * L / 4.2
     g.put(bump2.inputs["Height"], g.math("MULTIPLY", scar, -1.0))
     g.put(bump2.inputs["Normal"], bump.outputs["Normal"])
-    rough = g.mr(n2, 0.3, 0.7, 0.42, 0.62)
+    rough = g.mr(n2, 0.3, 0.7, 0.52, 0.70)
     g.bsdf(**{"Base Color": col, "Roughness": rough, "Normal": bump2.outputs["Normal"], "Subsurface Weight": 0.08,
               "Subsurface Radius": (1.0, 0.45, 0.25), "Subsurface Scale": 0.04 * L / 4.2, "Specular IOR Level": 0.45,
-              "Coat Weight": 0.12, "Coat Roughness": 0.35})
+              "Coat Weight": 0.035, "Coat Roughness": 0.45})
     return m
 
 
@@ -1621,6 +1623,8 @@ def main(stage):
     sc.render.resolution_x, sc.render.resolution_y = w, h
     sc.render.resolution_percentage = int(round(100 * a.scale))
     frame_camera(sc, w, h, (ax / w, ay / h))
+    if a.mode == "render":
+        bpy.ops.wm.save_as_mainfile(filepath=os.path.join(HERE, f"rex_{stage}.blend"), compress=True)
     if a.mode == "marker":
         # bright marker on the snout: report where the nose lands for each direction
         V = rig.deform(base_pose())

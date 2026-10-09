@@ -1,17 +1,28 @@
 /** Typed content tables for the connected world. Positions are world units (see world/projection.ts). */
+import { CONNECTED } from './connected-content';
 export type Dino = "rex" | "raptor" | "trike";
-export type RegionId = "hollow" | "river" | "marsh" | "dunes" | "ember" | "caves";
+export type RegionId =
+  "hollow" | "river" | "marsh" | "dunes" | "ember" | "caves";
 export interface Point {
   x: number;
   y: number;
 }
 export const STAGES = ["Hatchling", "Juvenile", "Hunter", "Apex"] as const;
-export const DINO_NAMES: Record<Dino, string> = { rex: "Rex", raptor: "Raptor", trike: "Triceratops" };
+export const DINO_NAMES: Record<Dino, string> = {
+  rex: "Rex",
+  raptor: "Raptor",
+  trike: "Triceratops",
+};
 
 /** growth points needed to complete stage i (index 0 -> Hatchling complete). Last = Apex, complete. */
 export const GROWTH = [8, 30, 90, 200];
 /** Stage milestones: completing the growth bar is not enough for Hunter/Apex. */
-export const MILESTONE: (string | null)[] = [null, "river-hunter", "marsh-pack", null];
+export const MILESTONE: (string | null)[] = [
+  null,
+  "river-hunter",
+  "marsh-pack",
+  null,
+];
 
 export interface StageStats {
   r: number; // body radius (collision)
@@ -40,8 +51,22 @@ export const DINOS: Record<Dino, DinoSpec> = {
     name: "Rex",
     atlas: "rex",
     stages: [
-      { r: 0.45, speed: 5.4, reach: 1.15, damage: 10, dodgeDist: 3.3, sprite: 1 },
-      { r: 0.65, speed: 5.3, reach: 1.5, damage: 18, dodgeDist: 3.7, sprite: 1 },
+      {
+        r: 0.45,
+        speed: 5.4,
+        reach: 1.15,
+        damage: 10,
+        dodgeDist: 3.3,
+        sprite: 1,
+      },
+      {
+        r: 0.65,
+        speed: 5.3,
+        reach: 1.5,
+        damage: 18,
+        dodgeDist: 3.7,
+        sprite: 1,
+      },
       { r: 0.9, speed: 5.1, reach: 1.9, damage: 32, dodgeDist: 4.0, sprite: 1 },
       { r: 1.2, speed: 4.9, reach: 2.4, damage: 54, dodgeDist: 4.3, sprite: 1 },
     ],
@@ -58,10 +83,31 @@ export const DINOS: Record<Dino, DinoSpec> = {
     name: "Raptor",
     atlas: "raptor",
     stages: [
-      { r: 0.4, speed: 6.6, reach: 1.1, damage: 8, dodgeDist: 3.8, sprite: 0.8 },
-      { r: 0.5, speed: 6.5, reach: 1.3, damage: 14, dodgeDist: 4.1, sprite: 0.9 },
+      {
+        r: 0.4,
+        speed: 6.6,
+        reach: 1.1,
+        damage: 8,
+        dodgeDist: 3.8,
+        sprite: 0.8,
+      },
+      {
+        r: 0.5,
+        speed: 6.5,
+        reach: 1.3,
+        damage: 14,
+        dodgeDist: 4.1,
+        sprite: 0.9,
+      },
       { r: 0.6, speed: 6.4, reach: 1.5, damage: 24, dodgeDist: 4.4, sprite: 1 },
-      { r: 0.7, speed: 6.3, reach: 1.7, damage: 38, dodgeDist: 4.6, sprite: 1.1 },
+      {
+        r: 0.7,
+        speed: 6.3,
+        reach: 1.7,
+        damage: 38,
+        dodgeDist: 4.6,
+        sprite: 1.1,
+      },
     ],
     biteCd: 0.36,
     dodgeCd: 0.85,
@@ -76,10 +122,31 @@ export const DINOS: Record<Dino, DinoSpec> = {
     name: "Triceratops",
     atlas: "trike",
     stages: [
-      { r: 0.6, speed: 4.6, reach: 1.3, damage: 11, dodgeDist: 2.6, sprite: 0.75 },
-      { r: 0.8, speed: 4.5, reach: 1.6, damage: 20, dodgeDist: 2.8, sprite: 0.88 },
+      {
+        r: 0.6,
+        speed: 4.6,
+        reach: 1.3,
+        damage: 11,
+        dodgeDist: 2.6,
+        sprite: 0.75,
+      },
+      {
+        r: 0.8,
+        speed: 4.5,
+        reach: 1.6,
+        damage: 20,
+        dodgeDist: 2.8,
+        sprite: 0.88,
+      },
       { r: 1.0, speed: 4.4, reach: 1.9, damage: 34, dodgeDist: 3.0, sprite: 1 },
-      { r: 1.25, speed: 4.3, reach: 2.2, damage: 52, dodgeDist: 3.2, sprite: 1.12 },
+      {
+        r: 1.25,
+        speed: 4.3,
+        reach: 2.2,
+        damage: 52,
+        dodgeDist: 3.2,
+        sprite: 1.12,
+      },
     ],
     biteCd: 0.5,
     dodgeCd: 1.1,
@@ -87,7 +154,8 @@ export const DINOS: Record<Dino, DinoSpec> = {
     skillName: "Charge",
     skillStage: 0,
     skillBlurb: "A committed charge that smashes rubble",
-    blurb: "Sturdy plant-eater. Gores with its horns, charges through rubble.",
+    blurb:
+      "Sturdy plant-eater. Graze fern patches to grow, defend with horns, charge through rubble.",
   },
 };
 export const MAX_HP = 3;
@@ -117,16 +185,185 @@ export interface CreatureSpec {
   cooldown?: number;
 }
 export const CREATURES: CreatureSpec[] = [
-  { id: "beetle", name: "Giant beetle", sprite: "beetle", role: "prey", r: 0.3, speed: 1.6, hp: 1, power: 0, reward: 1, sense: 4.5, scale: 1, fact: "It feeds, then freezes. Move slowly and it may not notice you." },
-  { id: "dragonfly", name: "Meganeura", sprite: "dragonfly", role: "prey", r: 0.3, speed: 4.2, hp: 1, power: 0, reward: 2, sense: 5.5, scale: 1, fact: "A giant dragonfly. Wait for it to settle on a reed." },
-  { id: "compy", name: "Compsognathus", sprite: "compy", role: "prey", r: 0.4, speed: 5.4, hp: 6, power: 0, reward: 3, sense: 8, scale: 1, fact: "Small, quick and always in a group." },
-  { id: "hypsi", name: "Hypsilophodon", sprite: "hypsilophodon", role: "prey", r: 0.55, speed: 5.1, hp: 16, power: 1, reward: 5, sense: 9, scale: 1, fact: "A nimble grazer. It bolts when you break into a run." },
-  { id: "raptor", name: "Velociraptor", sprite: "raptor", role: "lunger", r: 0.7, speed: 5.8, hp: 60, power: 2, reward: 14, sense: 11, scale: 1, fact: "Feathered, turkey-sized in life, with a hooked claw on each foot.", windup: 0.85, strike: 0.36, recover: 1.25, reach: 4.8, arc: 0.3, lungeSpeed: 12, damage: 1, cooldown: 1.4 },
-  { id: "oviraptor", name: "Oviraptor", sprite: "oviraptor", role: "lunger", r: 0.65, speed: 5.0, hp: 36, power: 1, reward: 8, sense: 9, scale: 1, fact: "Its name came from a mistaken reading of a nest.", windup: 0.8, strike: 0.34, recover: 1.1, reach: 4.0, arc: 0.3, lungeSpeed: 11, damage: 0.8, cooldown: 1.6 },
-  { id: "dilo", name: "Dilophosaurus", sprite: "dilophosaurus", role: "lunger", r: 0.85, speed: 4.8, hp: 90, power: 3, reward: 22, sense: 11, scale: 1, fact: "The real animal had two thin head crests and no neck frill.", windup: 0.9, strike: 0.4, recover: 1.3, reach: 5.2, arc: 0.3, lungeSpeed: 12, damage: 1.2, cooldown: 1.3 },
-  { id: "gigano", name: "Basalt Matriarch", sprite: "gigano", role: "sweeper", r: 1.7, speed: 4.4, hp: 260, power: 4, reward: 90, sense: 15, scale: 1, fact: "A giant of the south, with a long skull and heavy tail.", windup: 1.0, strike: 0.5, recover: 1.5, reach: 5.8, arc: 1.7, damage: 1.5, cooldown: 1.6 },
-  { id: "trike", name: "Triceratops", sprite: "trike", role: "armour", r: 1.1, speed: 3.2, hp: 100, power: 3, reward: 0, sense: 7, scale: 1, fact: "A three-horned plant-eater. Leave it in peace, or leave room for its charge.", windup: 1.0, strike: 0.7, recover: 1.6, reach: 8, arc: 0.22, lungeSpeed: 13, damage: 1.2, cooldown: 3 },
-  { id: "kentro", name: "Kentrosaurus", sprite: "kentro", role: "armour", r: 0.95, speed: 2.8, hp: 80, power: 2, reward: 0, sense: 6, scale: 1, fact: "Its spikes make it a neighbour to leave in peace." },
+  {
+    id: "beetle",
+    name: "Giant beetle",
+    sprite: "beetle",
+    role: "prey",
+    r: 0.3,
+    speed: 1.6,
+    hp: 1,
+    power: 0,
+    reward: 1,
+    sense: 4.5,
+    scale: 1,
+    fact: "It feeds, then freezes. Move slowly and it may not notice you.",
+  },
+  {
+    id: "dragonfly",
+    name: "Meganeura",
+    sprite: "dragonfly",
+    role: "prey",
+    r: 0.3,
+    speed: 4.2,
+    hp: 1,
+    power: 0,
+    reward: 2,
+    sense: 5.5,
+    scale: 1,
+    fact: "A giant dragonfly. Wait for it to settle on a reed.",
+  },
+  {
+    id: "compy",
+    name: "Compsognathus",
+    sprite: "compy",
+    role: "prey",
+    r: 0.4,
+    speed: 5.4,
+    hp: 6,
+    power: 0,
+    reward: 3,
+    sense: 8,
+    scale: 1,
+    fact: "Small, quick and always in a group.",
+  },
+  {
+    id: "hypsi",
+    name: "Hypsilophodon",
+    sprite: "hypsilophodon",
+    role: "prey",
+    r: 0.55,
+    speed: 5.1,
+    hp: 16,
+    power: 1,
+    reward: 5,
+    sense: 9,
+    scale: 1,
+    fact: "A nimble grazer. It bolts when you break into a run.",
+  },
+  {
+    id: "raptor",
+    name: "Velociraptor",
+    sprite: "raptor",
+    role: "lunger",
+    r: 0.7,
+    speed: 5.8,
+    hp: 60,
+    power: 2,
+    reward: 14,
+    sense: 11,
+    scale: 1,
+    fact: "Feathered, turkey-sized in life, with a hooked claw on each foot.",
+    windup: 0.85,
+    strike: 0.36,
+    recover: 1.25,
+    reach: 4.8,
+    arc: 0.3,
+    lungeSpeed: 12,
+    damage: 1,
+    cooldown: 1.4,
+  },
+  {
+    id: "oviraptor",
+    name: "Oviraptor",
+    sprite: "oviraptor",
+    role: "lunger",
+    r: 0.65,
+    speed: 5.0,
+    hp: 36,
+    power: 1,
+    reward: 8,
+    sense: 9,
+    scale: 1,
+    fact: "Its name came from a mistaken reading of a nest.",
+    windup: 0.8,
+    strike: 0.34,
+    recover: 1.1,
+    reach: 4.0,
+    arc: 0.3,
+    lungeSpeed: 11,
+    damage: 0.8,
+    cooldown: 1.6,
+  },
+  {
+    id: "dilo",
+    name: "Dilophosaurus",
+    sprite: "dilophosaurus",
+    role: "lunger",
+    r: 0.85,
+    speed: 4.8,
+    hp: 90,
+    power: 3,
+    reward: 22,
+    sense: 11,
+    scale: 1,
+    fact: "The real animal had two thin head crests and no neck frill.",
+    windup: 0.9,
+    strike: 0.4,
+    recover: 1.3,
+    reach: 5.2,
+    arc: 0.3,
+    lungeSpeed: 12,
+    damage: 1.2,
+    cooldown: 1.3,
+  },
+  {
+    id: "gigano",
+    name: "Basalt Matriarch",
+    sprite: "gigano",
+    role: "sweeper",
+    r: 1.7,
+    speed: 4.4,
+    hp: 260,
+    power: 4,
+    reward: 90,
+    sense: 15,
+    scale: 1,
+    fact: "A giant of the south, with a long skull and heavy tail.",
+    windup: 1.0,
+    strike: 0.5,
+    recover: 1.5,
+    reach: 5.8,
+    arc: 1.7,
+    damage: 1.5,
+    cooldown: 1.6,
+  },
+  {
+    id: "trike",
+    name: "Triceratops",
+    sprite: "trike",
+    role: "armour",
+    r: 1.1,
+    speed: 3.2,
+    hp: 100,
+    power: 3,
+    reward: 0,
+    sense: 7,
+    scale: 1,
+    fact: "A three-horned plant-eater. Leave it in peace, or leave room for its charge.",
+    windup: 1.0,
+    strike: 0.7,
+    recover: 1.6,
+    reach: 8,
+    arc: 0.22,
+    lungeSpeed: 13,
+    damage: 1.2,
+    cooldown: 3,
+  },
+  {
+    id: "kentro",
+    name: "Kentrosaurus",
+    sprite: "kentro",
+    role: "armour",
+    r: 0.95,
+    speed: 2.8,
+    hp: 80,
+    power: 2,
+    reward: 0,
+    sense: 6,
+    scale: 1,
+    fact: "Its spikes make it a neighbour to leave in peace.",
+  },
 ];
 export const creature = (id: string) => CREATURES.find((c) => c.id === id)!;
 
@@ -139,13 +376,16 @@ export interface Region {
   blurb: string;
   built: boolean;
 }
-export const REGIONS: Region[] = [
-  { id: "hollow", name: "Fern Hollow", bounds: [-2, -2, 66, 66], nest: { x: 27, y: 35 }, required: 0, blurb: "Learn the hunt. Follow the creek.", built: true },
-  { id: "river", name: "Riverbend", bounds: [66, -2, 130, 66], nest: { x: 100, y: 30 }, required: 0, blurb: "Read the river hunter's lunge.", built: false },
-];
+export const REGIONS: Region[] = CONNECTED.regions.map(r => ({ ...r, bounds: [...r.bounds], nest: { ...r.nest } }));
 export const byRegion = (id: RegionId) => REGIONS.find((r) => r.id === id)!;
 export const regionAt = (p: Point) =>
-  REGIONS.find((r) => p.x >= r.bounds[0] && p.x < r.bounds[2] && p.y >= r.bounds[1] && p.y < r.bounds[3]);
+  REGIONS.find(
+    (r) =>
+      p.x >= r.bounds[0] &&
+      p.x < r.bounds[2] &&
+      p.y >= r.bounds[1] &&
+      p.y < r.bounds[3],
+  );
 
 export interface Discovery extends Point {
   id: string;
@@ -155,20 +395,95 @@ export interface Discovery extends Point {
   blurb: string;
   reward: number;
 }
-export const DISCOVERIES: Discovery[] = [
-  { id: "fossil-hollow-shelf", region: "hollow", kind: "fossil", name: "Ancient ribs", blurb: "A fossil shelf above the stepping stones.", x: 46.2, y: 15.6, reward: 3 },
-  { id: "tracks-hollow", region: "hollow", kind: "tracks", name: "Unusual tracks", blurb: "Three-toed prints lead toward the south trail.", x: 25.5, y: 55, reward: 2 },
-  { id: "forage-hollow-a", region: "hollow", kind: "forage", name: "Sweet fern patch", blurb: "Soft young fronds. Restores health.", x: 34.5, y: 41.5, reward: 0 },
-  { id: "egg-hollow", region: "hollow", kind: "egg", name: "A clutch of eggs", blurb: "A nest beside the trail. Something will hatch here one day.", x: 47.5, y: 40.5, reward: 3 },
+const HOLLOW_DISCOVERIES: Discovery[] = [
+  {
+    id: "fossil-hollow-shelf",
+    region: "hollow",
+    kind: "fossil",
+    name: "Ancient ribs",
+    blurb: "A fossil shelf above the stepping stones.",
+    x: 46.2,
+    y: 15.6,
+    reward: 3,
+  },
+  {
+    id: "tracks-hollow",
+    region: "hollow",
+    kind: "tracks",
+    name: "Unusual tracks",
+    blurb: "Three-toed prints lead toward the south trail.",
+    x: 25.5,
+    y: 55,
+    reward: 2,
+  },
+  {
+    id: "forage-hollow-a",
+    region: "hollow",
+    kind: "forage",
+    name: "Sweet fern patch",
+    blurb: "Soft young fronds. Restores health.",
+    x: 34.5,
+    y: 41.5,
+    reward: 0,
+  },
+  {
+    id: "egg-hollow",
+    region: "hollow",
+    kind: "egg",
+    name: "Raptor eggs",
+    blurb: "Rescue the clutch to hatch a Raptor at your refuge.",
+    x: 47.5,
+    y: 40.5,
+    reward: 3,
+  },
+  {
+    id: "forage-hollow-b",
+    region: "hollow",
+    kind: "forage",
+    name: "Young fern patch",
+    blurb: "A plant-eater's meal beside the clearing.",
+    x: 31,
+    y: 39,
+    reward: 0,
+  },
+  {
+    id: "forage-hollow-c",
+    region: "hollow",
+    kind: "forage",
+    name: "Tender fronds",
+    blurb: "Fresh food beside the creek trail.",
+    x: 43,
+    y: 35,
+    reward: 0,
+  },
 ];
+export const DISCOVERIES: Discovery[] = [...HOLLOW_DISCOVERIES, ...CONNECTED.discoveries.map(d => ({...d}))];
+/** Shared by the simulation, save repair and journal. Unlocks never revoke earned species. */
+export const SPECIES_REQUIREMENTS: Record<Dino, string> = {
+  rex: "Your first hatchling",
+  raptor: "Rescue the Raptor eggs beside the east trail",
+  trike: "Find Ancient ribs and study four different creatures",
+};
+export function earnedSpecies(
+  discoveries: string[],
+  studied: string[],
+): Dino[] {
+  const species: Dino[] = ["rex"];
+  if (discoveries.includes("egg-hollow")) species.push("raptor");
+  if (discoveries.includes("fossil-hollow-shelf") && new Set(studied).size >= 4)
+    species.push("trike");
+  return species;
+}
 export interface Rival {
   id: string;
   name: string;
   species: string;
   region: RegionId;
   home: Point;
+  companions?: Point[];
+  pattern?: string;
 }
-export const RIVALS: Rival[] = [{ id: "river-hunter", name: "River Hunter", species: "raptor", region: "river", home: { x: 96, y: 26 } }];
+export const RIVALS: Rival[] = CONNECTED.rivals.map(r => ({...r, home: {...r.home}, companions: 'companions' in r ? r.companions.map(p => ({...p})) : []}));
 
 /** Initial population per region: [creature, x, y]. Hollow's raptor guards its perch. */
 export const SPAWNS: Record<RegionId, [string, number, number][]> = {
@@ -193,3 +508,26 @@ export const SPAWNS: Record<RegionId, [string, number, number][]> = {
   caves: [],
 };
 export const SENTINELS = new Set(["raptor@40.5,31"]);
+for (const id of ['river','marsh','dunes','ember','caves'] as RegionId[]) SPAWNS[id] = CONNECTED.spawns[id as keyof typeof CONNECTED.spawns].map(s => [...s] as [string,number,number]);
+export interface Gate extends Point { id:string; name:string; kind:string; requiredStage:number; width:number; normal:readonly number[]; fromRegion?:RegionId; toRegion?:RegionId; species?:Dino; optional?:boolean; prop?:string; action?:string; blurb?:string; }
+export interface Portal extends Point { id:string; name:string; to:Point; requiredStage:number; species?:Dino; bidirectional:boolean; optional:boolean; }
+export interface MasteryObjective { id:string; region:RegionId; name:string; kind:string; target?:string; count?:number; seconds?:number; reward:number; destination?:string; from?:Point; to?:Point; }
+export const GATES = CONNECTED.gates as unknown as readonly Gate[];
+export const PORTALS = CONNECTED.portals as unknown as readonly Portal[];
+export const OBJECTIVES = CONNECTED.objectives as unknown as readonly MasteryObjective[];
+export const WORLD_BOUNDS = [-20,-20,214,150] as const;
+export function objectiveDescription(o: MasteryObjective) {
+  switch(o.kind) {
+    case 'slow-hunt': return `Creep close and hunt ${o.count} beetles.`;
+    case 'settled-hunt': return `Wait still, then catch ${o.count} unaware dragonflies.`;
+    case 'clean-rival': return 'Win the whole encounter without taking a hit. Return to its territory for a rematch.';
+    case 'deliver-discovery': return 'Find the lost clutch and carry it back to the marsh refuge.';
+    case 'separated-rival': return 'Draw one pack hunter at least eight paces away from its companion, then defeat both.';
+    case 'escort': return 'Find the lost hatchling near the wing fossil and lead it home. It waits when you leave it behind or hunters attack.';
+    case 'recovery-hunt': return `Defeat ${o.count} Dilophosaurus during their recovery after a strike.`;
+    case 'observe-neutral': return `Watch an unprovoked Triceratops quietly for ${o.seconds} seconds.`;
+    case 'regional-fossils': return `Find all ${o.count} Echo Caves fossils.`;
+    default: return 'Explore and read the creatures around you.';
+  }
+}
+

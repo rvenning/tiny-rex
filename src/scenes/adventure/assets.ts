@@ -8,6 +8,7 @@ export interface PoseInfo {
 }
 export interface CreatureInfo {
   poses: Record<string, PoseInfo>;
+  renderScale?: number;
   r?: number;
   length?: number;
   height?: number;
@@ -27,22 +28,28 @@ export function loadCreature(scene: Phaser.Scene, id: string): Promise<boolean> 
   if (missing.has(id)) return Promise.resolve(false);
   const have = pending.get(id);
   if (have) return have;
-  const p = new Promise<boolean>((resolve) => {
+  const p = (async () => {
+    const url = `${BASE}creatures/${id}.json`;
+    let metadata: { textures?: unknown[]; meta?: CreatureInfo };
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Atlas ${id}: HTTP ${response.status}`);
+      metadata = await response.json();
+      if (!Array.isArray(metadata.textures)) throw new Error(`Atlas ${id} is not a multiatlas`);
+    } catch {
+      missing.add(id);
+      return false;
+    }
+    return new Promise<boolean>((resolve) => {
     const key = atlasKey(id);
     const url = `${BASE}creatures/${id}.json`;
-    const onDone = (file: Phaser.Loader.File) => {
-      if (file.key !== key) return;
+    const onDone = (completedKey: string) => {
+      if (completedKey !== key) return;
       scene.load.off(Phaser.Loader.Events.FILE_COMPLETE, onDone);
       scene.load.off(Phaser.Loader.Events.FILE_LOAD_ERROR, onFail);
-      // the atlas json was parsed by Phaser; fetch the meta ourselves (poses, fps)
-      fetch(url)
-        .then((r) => r.json())
-        .then((j) => {
-          const poses = (j.meta?.poses ?? {}) as Record<string, PoseInfo>;
-          infos.set(id, { poses, r: j.meta?.r, length: j.meta?.length, height: j.meta?.height });
-          resolve(true);
-        })
-        .catch(() => resolve(false));
+      const meta = metadata.meta;
+      infos.set(id, { poses: meta?.poses ?? {}, renderScale: meta?.renderScale ?? 1, r: meta?.r, length: meta?.length, height: meta?.height });
+      resolve(true);
     };
     const onFail = (file: Phaser.Loader.File) => {
       if (file.key !== key) return;
@@ -55,7 +62,8 @@ export function loadCreature(scene: Phaser.Scene, id: string): Promise<boolean> 
     scene.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, onFail);
     scene.load.multiatlas(key, url, `${BASE}creatures/`);
     if (!scene.load.isLoading()) scene.load.start();
-  });
+    });
+  })();
   pending.set(id, p);
   return p;
 }
@@ -90,7 +98,7 @@ export function loadProps(scene: Phaser.Scene): Promise<boolean> {
         .then((r) => r.json())
         .then((j) => {
           for (const t of j.textures ?? [])
-            for (const [name, f] of Object.entries<{ meta?: { kind?: PropFrame["kind"]; h?: number; r?: number } }>(t.frames))
+            for (const [name, f] of (Array.isArray(t.frames) ? t.frames.map((f: { filename: string; meta?: { kind?: PropFrame["kind"]; h?: number; r?: number } }) => [f.filename, f] as const) : Object.entries<{ meta?: { kind?: PropFrame["kind"]; h?: number; r?: number } }>(t.frames)))
               propMeta.set(name, { key: name, kind: f.meta?.kind ?? "deco", h: f.meta?.h ?? 1, r: f.meta?.r ?? 0 });
           resolve(true);
         })

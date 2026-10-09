@@ -8,6 +8,7 @@ export class ActorView {
   shadow: Phaser.GameObjects.Image;
   clock = Math.random() * 3;
   private lastKey = "";
+  private lastPose = "";
   constructor(
     private scene: Phaser.Scene,
     public atlasId: string,
@@ -23,11 +24,15 @@ export class ActorView {
   }
   /** pose: 'idle' | 'run' | ...; progress (0..1) drives one-shot poses; dir from heading in radians */
   update(dt: number, x: number, y: number, z: number, face: number, pose: string, progress?: number, flash = 0, alpha = 1) {
+    if (pose !== this.lastPose) {
+      this.clock = 0;
+      this.lastPose = pose;
+    }
     this.clock += dt;
     const p = proj(x, y, z);
     const ground = proj(x, y, z);
     this.sprite.setPosition(p.x, p.y).setDepth(p.y).setAlpha(alpha);
-    const sx = proj(x, y, 0);
+    const sx = proj(x, y, z);
     this.shadow
       .setPosition(sx.x + this.radius * 14, sx.y + this.radius * 3)
       .setDepth(sx.y - 0.5)
@@ -57,8 +62,8 @@ export class ActorView {
         this.lastKey = key;
       }
     }
-    this.sprite.setScale(this.scale);
-    if (flash > 0) this.sprite.setTintFill(0xfff4d8);
+    this.sprite.setScale(this.scale / Math.max(0.1, info.renderScale ?? 1));
+    if (flash > 0) this.sprite.setTint(0xfff4d8).setTintFill();
     else if (this.tint !== 0xffffff) this.sprite.setTint(this.tint);
     else this.sprite.clearTint();
   }
