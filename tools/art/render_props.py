@@ -11,6 +11,7 @@ import os
 import pkgutil
 import random
 import sys
+import zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -49,8 +50,9 @@ def render_one(name, prop, variant, out, samples):
     frame_camera(sc, w, h, prop.anchor)
     setup_lighting(sc)
     add_bounce_ground()
-    rng = random.Random(hash((name, variant)) & 0xFFFFFFFF)
+    rng = random.Random(zlib.crc32(f"{name}:{variant}".encode()))
     objs = prop.build(rng)
+    join_all(objs)  # what is rendered is exactly what the world renderer instances
     fname = f"{name}_{variant}.png"
     render_to(sc, os.path.join(out, fname))
     return dict(

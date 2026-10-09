@@ -7,3 +7,4 @@ art-build/
 .scratch/
 __pycache__/
 *.blend1
+art-reference/

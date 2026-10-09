@@ -243,3 +243,37 @@ def frame_camera(scene, w, h, anchor_frac=(0.5, 0.75)):
     scene.render.resolution_y = h
     ax, ay = w * anchor_frac[0], h * anchor_frac[1]
     return make_camera(scene, target=(0, 0, 0), ortho_width_px=w, w=w, h=h, shift_px=(w / 2 - ax, h / 2 - ay))
+
+
+def join_all(objs, name="prop"):
+    """Apply modifiers and merge `objs` (mesh objects) into ONE mesh object that keeps
+    every material slot. Prop builders must be join-safe: no parenting, no armatures,
+    no shape keys. The world renderer instances the joined mesh, so this is the contract."""
+    import bpy
+
+    meshes = [o for o in objs if o.type == "MESH"]
+    for o in objs:
+        if o.type != "MESH":
+            raise RuntimeError(f"{o.name}: only mesh objects are allowed in a prop (got {o.type})")
+    bpy.ops.object.select_all(action="DESELECT")
+    dg = bpy.context.evaluated_depsgraph_get()
+    for o in meshes:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = meshes[0]
+    # bake modifiers
+    for o in meshes:
+        bpy.context.view_layer.objects.active = o
+        for m in list(o.modifiers):
+            try:
+                bpy.ops.object.modifier_apply(modifier=m.name)
+            except RuntimeError:
+                o.modifiers.remove(m)
+    bpy.ops.object.select_all(action="DESELECT")
+    for o in meshes:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = meshes[0]
+    if len(meshes) > 1:
+        bpy.ops.object.join()
+    out = bpy.context.view_layer.objects.active
+    out.name = name
+    return out
