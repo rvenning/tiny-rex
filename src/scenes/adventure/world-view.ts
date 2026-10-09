@@ -96,6 +96,13 @@ export class GroundLayer {
   }
 }
 
+/** [sway amplitude in degrees, frequency]: plants lean about their foot; stiff props (rocks, logs, nests) are absent. */
+const SWAY: Record<string, [number, number]> = {
+  fern_small: [2.2, 1.1], fern_medium: [2.2, 0.9], fern_large: [1.9, 0.8], tree_fern: [1.2, 0.6], cycad: [1.4, 0.7],
+  broadleaf: [2.6, 0.8], palm_small: [1.3, 0.55], palm_tall: [1.0, 0.45], horsetail: [2.8, 1.3], reed_clump: [3, 1.2],
+  cattail_clump: [2.8, 1.1], flower_red_spike: [2.8, 1.4], flower_purple: [2.4, 1.3], foreground_frond: [2.4, 0.7],
+  grass_tuft: [3.4, 1.4], moss_clump: [0, 0], lily_pad: [0, 0],
+};
 interface PropRec {
   name: string;
   frame: string;
@@ -104,6 +111,7 @@ interface PropRec {
   x: number;
   y: number;
   removed?: boolean;
+  push?: number;
   scale: number;
   kind: "solid" | "soft" | "deco";
   img?: Phaser.GameObjects.Image;
@@ -170,6 +178,28 @@ export class PropLayer {
         r.img = undefined;
         this.live.delete(r);
       }
+  }
+  /** Wind: every plant leans about its foot with a travelling gust, and bends away from anything walking through it. */
+  sway(time: number, dt: number, strength: number, movers: { x: number; y: number; r: number }[]) {
+    for (const r of this.live) {
+      const cfg = SWAY[r.name];
+      if (!cfg || !cfg[0] || !r.img) continue;
+      const gust = 0.5 + 0.5 * Math.sin(time * 0.31 + (r.x - r.y) * 0.045);
+      const a = ((cfg[0] * Math.PI) / 180) * strength * (0.45 + gust) * Math.sin(time * cfg[1] * 2 + r.x * 0.37 + r.y * 0.23);
+      let push = 0;
+      for (const m of movers) {
+        const dx = r.x - m.x,
+          dy = r.y - m.y,
+          R = m.r + 1.5,
+          d2 = dx * dx + dy * dy;
+        if (d2 < R * R) {
+          const f = 1 - Math.sqrt(d2) / R;
+          push += (dx - dy >= 0 ? 1 : -1) * f * 0.22;
+        }
+      }
+      r.push = (r.push ?? 0) + (push - (r.push ?? 0)) * Math.min(1, dt * 9);
+      r.img.rotation = a + r.push * (cfg[0] > 0 ? 1 : 0);
+    }
   }
   /** soft foliage in front of the player fades so the hunt stays readable */
   fade(player: { x: number; y: number }, extra: { x: number; y: number }[], dt: number) {

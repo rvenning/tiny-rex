@@ -71,6 +71,37 @@ export function makeTextures(scene: Phaser.Scene) {
     c.arc(64, 64, 58, 0, Math.PI * 2);
     c.stroke();
   });
+  // slow cloud shadows: low-frequency blotches, multiplied over the world
+  make("fx-clouds", 512, 512, (c) => {
+    const blobs = 46;
+    c.fillStyle = "rgb(255,255,255)";
+    c.fillRect(0, 0, 512, 512);
+    let seed = 7;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    for (let i = 0; i < blobs; i++) {
+      const x = rnd() * 512,
+        y = rnd() * 512,
+        r = 40 + rnd() * 90;
+      for (const ox of [-512, 0, 512])
+        for (const oy of [-512, 0, 512]) {
+          const g = c.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, r);
+          g.addColorStop(0, "rgba(90,110,120,0.55)");
+          g.addColorStop(1, "rgba(90,110,120,0)");
+          c.fillStyle = g;
+          c.fillRect(x + ox - r, y + oy - r, r * 2, r * 2);
+        }
+    }
+  });
+  make("fx-bird", 48, 24, (c) => {
+    c.strokeStyle = "#101c14";
+    c.lineWidth = 3.2;
+    c.lineCap = "round";
+    c.beginPath();
+    c.moveTo(3, 14);
+    c.quadraticCurveTo(12, 2, 24, 14);
+    c.quadraticCurveTo(36, 2, 45, 14);
+    c.stroke();
+  });
   // icons above heads
   make("icon-warn", 64, 64, (c) => {
     c.fillStyle = "#1b0d0d";

@@ -26,6 +26,43 @@ SURF = ["grass", "dirt", "moss", "rock", "mud", "gravel", "sand", "basalt", "lav
 TILE = 1024
 
 
+def add_canopy(scene, W, center, radius=48.0, seed=3):
+    """Invisible-to-camera frond clusters high above the ground: they only cast the dappled shade that makes
+    open dirt read as sunlit forest floor. Placed so the shadows land on dirt, leaving a sunlit lane."""
+    rng = np.random.default_rng(seed)
+    dirt = W["surf"][SURF.index("dirt")]
+    X, Y = W["X"], W["Y"]
+    sv = sun_vector()
+    mat = bpy.data.materials.new("canopy")
+    mat.use_nodes = True
+    n = 0
+    step = 12
+    ys, xs = np.nonzero(dirt[::step, ::step] > 0.55)
+    for iy, ix in zip(ys * step, xs * step):
+        gx, gy = float(X[iy, ix]), float(Y[iy, ix])
+        if math.hypot(gx - center[0], gy - center[1]) > radius:
+            continue
+        # large-scale clumping so some dirt stays in full sun
+        if rng.random() > 0.5 + 0.25 * math.sin(gx * 0.31) * math.cos(gy * 0.27):
+            continue
+        h = rng.uniform(6.0, 9.0)
+        bx, by = b_xy(gx + rng.normal(0, 0.6), gy + rng.normal(0, 0.6))
+        # caster sits sunward of the target so its shadow lands on it
+        cx, cy = bx + sv.x / sv.z * h, by + sv.y / sv.z * h
+        yaw0 = rng.uniform(0, math.pi * 2)
+        for k in range(int(rng.integers(4, 8))):
+            yaw = yaw0 + k * (math.pi * 2 / 6) + rng.normal(0, 0.25)
+            ln = rng.uniform(1.3, 2.4)
+            bpy.ops.mesh.primitive_uv_sphere_add(radius=1.0, location=(cx + math.cos(yaw) * ln * 0.6, cy + math.sin(yaw) * ln * 0.6, h + rng.normal(0, 0.3)), segments=8, ring_count=4)
+            o = bpy.context.object
+            o.scale = (ln, rng.uniform(0.22, 0.4), 0.05)
+            o.rotation_euler = (0, 0, yaw)
+            o.visible_camera = False
+            o.data.materials.append(mat)
+            n += 1
+    print(f"Canopy casters: {n}", flush=True)
+
+
 def add_prop_geometry(scene, records, center=None):
     """Share variant meshes; bake ground clutter and cast tall-prop shadows.
 
@@ -344,7 +381,7 @@ def build_water_material():
     foam = T.math("MULTIPLY", patchy, T.math("MULTIPLY", shore, 0.95))
     foam = T.math("MAXIMUM", foam, T.math("MULTIPLY", T.math("MINIMUM", T.math("MAXIMUM", T.math("MULTIPLY", T.math("SUBTRACT", streak, 0.68), 6.0), 0.0), 1.0), 0.55))
     dd = T.math("MINIMUM", T.math("POWER", T.math("MINIMUM", depth, 1.0), 0.7), 1.0)
-    col = T.ramp(dd, [(0.0, (0.30, 0.82, 0.55)), (0.35, (0.04, 0.56, 0.52)), (0.7, (0.0, 0.34, 0.42)), (1.0, (0.0, 0.2, 0.32))])
+    col = T.ramp(dd, [(0.0, (0.30, 0.80, 0.54)), (0.28, (0.06, 0.52, 0.50)), (0.62, (0.0, 0.27, 0.35)), (1.0, (0.0, 0.10, 0.20))])
     # soft current striping in the colour, not hard caustic cells
     col = T.mix(T.math("MULTIPLY", T.math("SUBTRACT", streak, 0.5), 0.9), col, (0.22, 0.78, 0.74))
     col = T.mix(foam, col, (0.93, 0.98, 0.96))
@@ -501,6 +538,7 @@ def main():
     ap.add_argument("--name", default="test")
     ap.add_argument("--samples", type=int, default=64)
     ap.add_argument("--props", action="store_true")
+    ap.add_argument("--canopy", action="store_true")
     ap.add_argument("--all", action="store_true")
     ap.add_argument("--publish", default="")
     ap.add_argument("--pixel-scale", type=float, default=1.0)
@@ -532,8 +570,28 @@ def main():
         for _ in range(3):
             m = m | np.roll(m, 1, 0) | np.roll(m, -1, 0) | np.roll(m, 1, 1) | np.roll(m, -1, 1)
         level = np.where(wet, wl, np.nanmean(wl)).astype(np.float32)
-        depth = np.clip(level - W["z"], 0, 1.4).astype(np.float32)
-        wmesh = grid_mesh("Water", W["X"], W["Y"], level + 0.0, {"depth": depth[..., None]}, mask=m)
+        K = 3  # water is meshed 3x finer than the terrain so shorelines are smooth curves, not 20px stair-steps
+
+        def up(a):
+            ny_, nx_ = a.shape
+            xs_ = np.linspace(0, nx_ - 1, nx_ * K - (K - 1))
+            ys_ = np.linspace(0, ny_ - 1, ny_ * K - (K - 1))
+            ix = np.floor(xs_).astype(int)
+            iy = np.floor(ys_).astype(int)
+            fx = (xs_ - ix)[None, :]
+            fy = (ys_ - iy)[:, None]
+            ix1 = np.minimum(ix + 1, nx_ - 1)
+            iy1 = np.minimum(iy + 1, ny_ - 1)
+            return (a[iy][:, ix] * (1 - fx) * (1 - fy) + a[iy][:, ix1] * fx * (1 - fy) + a[iy1][:, ix] * (1 - fx) * fy + a[iy1][:, ix1] * fx * fy).astype(np.float32)
+
+        zf, lf, mf = up(W["z"]), up(level), up(m.astype(np.float32)) > 0.15
+        depth = np.clip(lf - zf, 0, 1.4)
+        for _ in range(2):
+            depth = (depth + np.roll(depth, 1, 0) + np.roll(depth, -1, 0) + np.roll(depth, 1, 1) + np.roll(depth, -1, 1)) / 5
+        Xf = np.linspace(W["X"][0, 0], W["X"][0, -1], W["X"].shape[1] * K - (K - 1))
+        Yf = np.linspace(W["Y"][0, 0], W["Y"][-1, 0], W["Y"].shape[0] * K - (K - 1))
+        XF, YF = np.meshgrid(Xf, Yf)
+        wmesh = grid_mesh("Water", XF, YF, lf, {"depth": np.repeat(depth[..., None].astype(np.float32), 3, -1)}, mask=mf)
         wob = bpy.data.objects.new("Water", wmesh)
         sc.collection.objects.link(wob)
         wob.data.materials.append(build_water_material())
@@ -547,6 +605,8 @@ def main():
     if a.props:
         center = tuple(float(v) for v in a.center.split(",")) if a.center else None
         add_prop_geometry(sc, W["props"]["props"], center)
+    if a.canopy:
+        add_canopy(sc, W, tuple(float(v) for v in a.center.split(",")) if a.center else (31.0, 35.0))
     if a.center:
         cx, cy = [float(v) for v in a.center.split(",")]
         w, h = [int(v) for v in a.size.split(",")]

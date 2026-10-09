@@ -9,6 +9,7 @@ import type { World } from "../world/world";
 import { ActorView } from "./adventure/actor-view";
 import { hasCreature, loadCreature, loadProps, unloadCreature } from "./adventure/assets";
 import { Fx, makeTextures } from "./adventure/fx";
+import { Ambient } from "./adventure/ambient";
 import { GroundLayer, PropLayer } from "./adventure/world-view";
 
 const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -39,6 +40,7 @@ export class AdventureScene extends Phaser.Scene {
   private ground!: GroundLayer;
   private props!: PropLayer;
   private fx!: Fx;
+  private ambient?: Ambient;
   private cues!: Phaser.GameObjects.Graphics;
   private views = new Map<number, ActorView>();
   private icons = new Map<number, Phaser.GameObjects.Image>();
@@ -139,6 +141,7 @@ export class AdventureScene extends Phaser.Scene {
     if (!this.sys.isActive()) return;
     this.ground = new GroundLayer(this, this.world);
     this.props = new PropLayer(this, this.world);
+    this.ambient = new Ambient(this, this.fx, this.world.grid, this.reduced);
     for (const d of DISCOVERIES) {
       const m = this.add.image(0, 0, "icon-find").setScale(0.5).setVisible(false);
       this.markers.set(d.id, m);
@@ -255,6 +258,8 @@ export class AdventureScene extends Phaser.Scene {
     this.loadingEl?.remove();
     this.ground?.destroy();
     this.props?.destroy();
+    this.ambient?.destroy();
+    this.ambient = undefined;
     this.fx?.destroy();
     for (const v of this.views.values()) v.destroy();
     this.views.clear();
@@ -353,11 +358,24 @@ export class AdventureScene extends Phaser.Scene {
     const view = this.cameras.main.worldView;
     this.ground.update(view);
     this.props.update(view);
+    this.animateWorld(dt, view);
     this.draw(dt);
     this.streamCreatures(dt);
     this.fx.update(dt);
     this.updateHud(dt);
     this.updateFloaters(dt);
+  }
+  private animateWorld(dt: number, view: Phaser.Geom.Rectangle) {
+    const sim = this.sim;
+    const movers = [{ x: sim.player.x, y: sim.player.y, r: sim.radius }];
+    const wading = [{ x: sim.player.x, y: sim.player.y, r: sim.radius }];
+    for (const a of sim.actors) {
+      if (a.state === "dead" || dist(a, sim.player) > 18) continue;
+      if (a.spec.role !== "prey" || a.speedNow > 0.4) movers.push({ x: a.x, y: a.y, r: a.spec.r });
+      if (a.speedNow > 0.4) wading.push({ x: a.x, y: a.y, r: a.spec.r });
+    }
+    this.props.sway(sim.time, dt, this.ambient?.wind ?? 0.2, movers);
+    this.ambient?.update(dt, view, this.cameras.main.zoom, sim.player.speedNow > 0.4 ? wading : wading.slice(1));
   }
   private async onTier() {
     const first = this.lastTier < 0;
