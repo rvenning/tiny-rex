@@ -28,10 +28,20 @@ const game = new Phaser.Game({
   fps: { target: 60 },
   scene: [BootScene, MenuScene, AdventureScene],
 });
+let fitFrame = 0;
+/** Keep the canvas exactly as large as the window. Phaser's own zoom bookkeeping can lag one resize behind, so the
+ *  CSS box is set explicitly and the scale manager is told to re-measure it (input coordinates depend on that). */
 function fit() {
-  const s = renderScale();
-  game.scale.setZoom(1 / s);
-  game.scale.resize(Math.round(innerWidth * s), Math.round(innerHeight * s));
+  cancelAnimationFrame(fitFrame);
+  fitFrame = requestAnimationFrame(() => {
+    const s = renderScale();
+    game.scale.resize(Math.round(innerWidth * s), Math.round(innerHeight * s));
+    game.scale.setZoom(1 / s);
+    const c = game.canvas;
+    c.style.width = innerWidth + "px";
+    c.style.height = innerHeight + "px";
+    game.scale.refresh();
+  });
 }
 addEventListener("resize", fit);
 addEventListener("orientationchange", () => setTimeout(fit, 120));

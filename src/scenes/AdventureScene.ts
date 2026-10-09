@@ -66,6 +66,7 @@ export class AdventureScene extends Phaser.Scene {
   private floaters: Phaser.GameObjects.Text[] = [];
   private flashEl?: HTMLElement;
   private lastTier = -1;
+  private lastDino = "";
   private shown = new Set<number>();
   private creatureStreamTimer = 0;
   private clearedProps = new Set<string>();
@@ -91,6 +92,7 @@ export class AdventureScene extends Phaser.Scene {
     this.lastSave = 0;
     this.hitStop = 0;
     this.lastTier = -1;
+    this.lastDino = "";
     this.creatureStreamTimer = 0;
     this.clearedProps.clear();
     this.celebratedCatch = false;
@@ -346,7 +348,7 @@ export class AdventureScene extends Phaser.Scene {
     }
     for (const e of this.sim.events.splice(0)) this.onEvent(e);
     if (this.sim.time - this.lastSave > 8) this.persist();
-    if (this.sim.tier !== this.lastTier) this.onTier();
+    if (this.sim.tier !== this.lastTier || this.sim.dino !== this.lastDino) this.onTier();
     this.updateCamera(dt);
     const view = this.cameras.main.worldView;
     this.ground.update(view);
@@ -360,6 +362,7 @@ export class AdventureScene extends Phaser.Scene {
   private async onTier() {
     const first = this.lastTier < 0;
     this.lastTier = this.sim.tier;
+    this.lastDino = this.sim.dino;
     const id = this.playerAtlasId();
     const ok = await loadCreature(this, id);
     if (ok || first) this.swapPlayer(id);
