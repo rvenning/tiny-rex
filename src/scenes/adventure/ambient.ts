@@ -3,6 +3,28 @@ import { proj, unproj } from "../../world/projection";
 import type { WorldGrid } from "../../world/grid";
 import type { Fx } from "./fx";
 
+export interface FallFeature {
+  kind: string;
+  x: number;
+  y: number;
+  w?: number;
+  ztop?: number;
+  zbot?: number;
+}
+const D = Math.SQRT1_2;
+const run = (t: number) => 0.25 + 1.15 * t * t; // the sheet leaves the cliff as it falls (matches tools/art/render_world.py)
+interface Streak {
+  img: Phaser.GameObjects.Image;
+  s: number;
+  u: number;
+  v: number;
+}
+interface Fall {
+  f: Required<Pick<FallFeature, "x" | "y" | "w" | "ztop" | "zbot">>;
+  streaks: Streak[];
+  mist: number;
+}
+
 /** The living layer on top of the baked world: drifting leaves and pollen, water glints and wading ripples,
  *  slow cloud shadows and the odd bird. All of it is decorative and honours reduced motion. */
 export class Ambient {
@@ -14,12 +36,21 @@ export class Ambient {
   private rippleT = 0;
   private birdT = 12 + Math.random() * 10;
   private birds: Phaser.GameObjects.Image[] = [];
+  private falls: Fall[] = [];
   constructor(
     private scene: Phaser.Scene,
     private fx: Fx,
     private grid: WorldGrid,
     private reduced: boolean,
+    features: FallFeature[] = [],
   ) {
+    if (!reduced)
+      for (const f of features) {
+        if (f.kind !== "waterfall") continue;
+        const fall: Fall = { f: { x: f.x, y: f.y, w: f.w ?? 3, ztop: f.ztop ?? 2.3, zbot: f.zbot ?? -0.2 }, streaks: [], mist: 0 };
+        for (let i = 0; i < 46; i++) fall.streaks.push({ img: scene.add.image(0, 0, "fx-streak").setBlendMode(Phaser.BlendModes.ADD), s: Math.random() - 0.5, u: Math.random(), v: 0.8 + Math.random() * 0.5 });
+        this.falls.push(fall);
+      }
     if (!reduced) {
       this.clouds = scene.add.image(0, 0, "fx-clouds").setBlendMode(Phaser.BlendModes.MULTIPLY).setAlpha(0.55).setDepth(8e5);
     }
@@ -31,6 +62,31 @@ export class Ambient {
   update(dt: number, view: Phaser.Geom.Rectangle, zoom: number, wading: { x: number; y: number; r: number }[]) {
     this.t += dt;
     if (this.reduced) return;
+    // --- the waterfall: streaks run down the sheet, mist blooms at its foot
+    for (const fall of this.falls) {
+      const { x, y, w, ztop, zbot } = fall.f;
+      const foot = proj(x + D * 1.45, y + D * 1.45, zbot);
+      if (foot.x < view.x - 300 || foot.x > view.right + 300 || foot.y < view.y - 700 || foot.y > view.bottom + 300) {
+        for (const st of fall.streaks) st.img.setVisible(false);
+        continue;
+      }
+      for (const st of fall.streaks) {
+        const t = (st.u + this.t * 0.55 * st.v) % 1;
+        const side = st.s * w * (1 + 0.25 * t);
+        const gx = x + D * run(t) - D * side,
+          gy = y + D * run(t) + D * side;
+        const q = proj(gx, gy, ztop + (zbot - ztop) * t);
+        st.img.setVisible(true).setPosition(q.x, q.y).setDepth(q.y + 6).setAlpha(Math.sin(Math.PI * t) ** 0.6 * 0.5).setScale(0.55 + 0.2 * st.v, 0.5 + t * 0.9);
+      }
+      fall.mist -= dt;
+      if (fall.mist <= 0) {
+        fall.mist = 0.1;
+        const s = (Math.random() - 0.5) * w;
+        const q = proj(x + D * 1.45 - D * s, y + D * 1.45 + D * s, zbot + 0.15);
+        this.fx.spawn("fx-soft", q.x, q.y, { vx: (Math.random() - 0.5) * 14, vy: -16 - Math.random() * 14, life: 1.5, a: 0.4, s0: 0.35, s1: 1.0, tint: 0xeaf8ff, depth: q.y + 8 });
+        if (Math.random() < 0.5) this.fx.spawn("fx-spark", q.x, q.y - 4, { vx: (Math.random() - 0.5) * 60, vy: -40 - Math.random() * 40, g: 120, life: 0.5, a: 0.8, s0: 0.12, s1: 0.05, tint: 0xffffff, depth: q.y + 9, blend: Phaser.BlendModes.ADD });
+      }
+    }
     // --- cloud shadows: one big multiplied image, drifting across the ground
     if (this.clouds) {
       const w = view.width * 1.6,
@@ -118,6 +174,8 @@ export class Ambient {
   }
   destroy() {
     this.clouds?.destroy();
+    for (const f of this.falls) for (const st of f.streaks) st.img.destroy();
+    this.falls = [];
     for (const b of this.birds) b.destroy();
     this.birds = [];
   }

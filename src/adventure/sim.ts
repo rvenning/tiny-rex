@@ -273,6 +273,30 @@ export class Adventure {
     const mastery = OBJECTIVES.find(o => o.region === this.region && !s.challenges.includes(o.id));
     return mastery ? `Mastery · ${mastery.name}` : 'Explore the caves, collect fossils and master the world';
   }
+  /** where the current objective points: the arrow, minimap marker and distance all follow this */
+  get objectiveTarget(): Point | null {
+    const s = this.save,
+      p = this.player;
+    const nearest = (pts: Point[]) => (pts.length ? pts.reduce((a, b) => (dist(a, p) < dist(b, p) ? a : b)) : null);
+    const prey = (id?: string) => nearest(this.actors.filter((a) => a.state !== "dead" && a.spec.role === "prey" && (!id || a.spec.id === id)));
+    const find = (region?: RegionId) => nearest(DISCOVERIES.filter((d) => d.kind !== "forage" && !s.discoveries.includes(d.id) && (!region || d.region === region)));
+    const gate = (id: string) => GATES.find((g) => g.id === id) ?? null;
+    const rival = (id: string) => this.actors.find((a) => a.rival === id && a.state !== "dead") ?? RIVALS.find((r) => r.id === id)?.home ?? null;
+    if (!s.discoveries.includes("fossil-hollow-shelf") && !s.challenges.includes("first-hunt") && this.tier === 0 && s.xp.rex < 4) return prey("beetle") ?? prey();
+    if (this.tier === 0 && s.xp[this.dino] < GROWTH[0]) return prey();
+    if (this.tier === 0) return byRegion(this.region).nest;
+    if (!byRegion("river").built) return find();
+    if (!s.regions.includes("river")) return byRegion("river").nest;
+    if (!s.rivals.includes("river-hunter")) return rival("river-hunter");
+    if (this.tier < 2) return find("river") ?? prey();
+    if (!s.regions.includes("marsh")) return p.y < (gate("river-ford")?.y ?? 66) ? gate("river-ford") : byRegion("marsh").nest;
+    if (!s.rivals.includes("marsh-pack")) return rival("marsh-pack");
+    if (this.tier < 3) return find() ?? prey();
+    if (!s.regions.includes("dunes")) return p.x < 130 ? gate("marsh-log") : byRegion("dunes").nest;
+    if (!s.regions.includes("ember")) return p.y > 66 ? gate("ember-basalt") : byRegion("ember").nest;
+    if (!s.rivals.includes("basalt-matriarch")) return rival("basalt-matriarch");
+    return null;
+  }
   actorsNear(p: Point, r: number) {
     return this.actors.filter((a) => a.state !== "dead" && dist(a, p) < r);
   }

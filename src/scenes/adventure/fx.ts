@@ -92,6 +92,16 @@ export function makeTextures(scene: Phaser.Scene) {
         }
     }
   });
+  make("fx-streak", 12, 64, (c) => {
+    const g = c.createLinearGradient(0, 0, 0, 64);
+    g.addColorStop(0, "rgba(255,255,255,0)");
+    g.addColorStop(0.35, "rgba(240,252,255,0.95)");
+    g.addColorStop(1, "rgba(240,252,255,0)");
+    c.fillStyle = g;
+    c.beginPath();
+    c.ellipse(6, 32, 3, 31, 0, 0, Math.PI * 2);
+    c.fill();
+  });
   make("fx-bird", 48, 24, (c) => {
     c.strokeStyle = "#101c14";
     c.lineWidth = 3.2;
@@ -100,6 +110,21 @@ export function makeTextures(scene: Phaser.Scene) {
     c.moveTo(3, 14);
     c.quadraticCurveTo(12, 2, 24, 14);
     c.quadraticCurveTo(36, 2, 45, 14);
+    c.stroke();
+  });
+  make("icon-arrow", 64, 64, (c) => {
+    c.translate(32, 32);
+    c.fillStyle = "rgba(10,28,20,0.9)";
+    c.strokeStyle = "#ffd36a";
+    c.lineWidth = 4;
+    c.lineJoin = "round";
+    c.beginPath();
+    c.moveTo(24, 0);
+    c.lineTo(-10, -18);
+    c.lineTo(-3, 0);
+    c.lineTo(-10, 18);
+    c.closePath();
+    c.fill();
     c.stroke();
   });
   // icons above heads

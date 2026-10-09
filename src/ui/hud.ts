@@ -264,7 +264,7 @@ export class Hud {
       }
     this.map = { base, s, ox, oy: 0 };
   }
-  drawMap(px: number, py: number, markers: MapMarker[]) {
+  drawMap(px: number, py: number, markers: MapMarker[], route: { x: number; y: number }[] = []) {
     const m = this.map;
     if (!m) return;
     const c = this.mapCtx,
@@ -280,6 +280,20 @@ export class Hud {
     const rx = (px - py) * Math.SQRT1_2 * m.s + m.ox,
       ry = (px + py) * Math.SQRT1_2 * m.s;
     c.drawImage(m.base, cx - rx, cx - ry);
+    if (route.length > 1) {
+      c.strokeStyle = "#ffd36a";
+      c.lineWidth = 3;
+      c.setLineDash([6, 5]);
+      c.beginPath();
+      route.forEach((q, i) => {
+        const x = cx + ((q.x - q.y) * Math.SQRT1_2 * m.s + m.ox - rx),
+          y = cx + ((q.x + q.y) * Math.SQRT1_2 * m.s - ry);
+        if (i) c.lineTo(x, y);
+        else c.moveTo(x, y);
+      });
+      c.stroke();
+      c.setLineDash([]);
+    }
     for (const k of markers) {
       const mx = cx + ((k.x - k.y) * Math.SQRT1_2 * m.s + m.ox - rx),
         my = cx + ((k.x + k.y) * Math.SQRT1_2 * m.s - ry);
