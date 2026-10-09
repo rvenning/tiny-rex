@@ -5,6 +5,12 @@ import {
   type Progress,
 } from "./storage";
 import { validateProfile, validateProgress, validId } from "./validation";
+import {
+  AdventureStore,
+  mergeAdventure,
+  validateAdventure,
+  type AdventureSave,
+} from "../adventure/save";
 export function sameData(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (!a || !b || typeof a !== "object" || typeof b !== "object") return false;
@@ -25,6 +31,8 @@ export function reconcile(
     remoteProgress = new Map<string, Progress>(),
     remoteDeleted = new Set<string>();
   const localDeleted = store.read<unknown>("deleted", []);
+  const remoteAdventures = new Map<string, AdventureSave>();
+  const adventureStore = new AdventureStore();
   const deleted = new Set(
     Array.isArray(localDeleted) ? localDeleted.filter(validId) : [],
   );
@@ -32,6 +40,11 @@ export function reconcile(
     if (doc.id.startsWith("deleted_") && validId(doc.id.slice(8))) {
       remoteDeleted.add(doc.id.slice(8));
       deleted.add(doc.id.slice(8));
+    } else if (
+      doc.id.startsWith("adventure_v1_") &&
+      validId(doc.id.slice(13))
+    ) {
+      remoteAdventures.set(doc.id.slice(13), validateAdventure(doc.data));
     } else if (doc.id.startsWith("profile_")) {
       const p = validateProfile(doc.data, doc.id.slice(8));
       if (p) remoteProfiles.set(p.id, p);
@@ -49,6 +62,15 @@ export function reconcile(
   store.write("deleted", [...deleted], false);
   store.write("profiles", [...byId.values()], false);
   for (const p of byId.values()) {
+    const localAdventure = adventureStore.read(p.id);
+    const remoteAdventure = remoteAdventures.get(p.id);
+    const adventure = remoteAdventure
+      ? mergeAdventure(localAdventure, remoteAdventure)
+      : localAdventure;
+    if (remoteAdventure) adventureStore.write(p.id, adventure);
+    if (adventure.updated > 0 && !sameData(adventure, remoteAdventure))
+      queued.set("adventure_v1_" + p.id, adventure);
+    else queued.delete("adventure_v1_" + p.id);
     if (!sameData(p, remoteProfiles.get(p.id)))
       queued.set("profile_" + p.id, p);
     else queued.delete("profile_" + p.id);
@@ -62,9 +84,12 @@ export function reconcile(
   for (const id of deleted) {
     try {
       localStorage.removeItem("trex_progress_" + id);
+      localStorage.removeItem("trex_adventure_v1_" + id);
+      localStorage.removeItem("trex_adventure_v1_" + id + "_backup");
     } catch {}
     queued.delete("profile_" + id);
     queued.delete("progress_" + id);
+    queued.delete("adventure_v1_" + id);
     if (!remoteDeleted.has(id) && !queued.has("deleted_" + id))
       queued.set("deleted_" + id, { id, at: Date.now() });
     else if (remoteDeleted.has(id)) queued.delete("deleted_" + id);

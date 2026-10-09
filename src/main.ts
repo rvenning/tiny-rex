@@ -1,11 +1,13 @@
 import * as Phaser from "phaser";
 import { registerSW } from "virtual:pwa-register";
 import { BootScene } from "./scenes/BootScene";
+import { AdventureScene } from "./scenes/AdventureScene";
 import { MenuScene } from "./scenes/MenuScene";
 import { PlayScene } from "./scenes/PlayScene";
 import { presentation } from "./game/config";
 import { App } from "./ui/app";
 import "./ui/style.css";
+import "./ui/adventure.css";
 
 document.getElementById("stage")!.tabIndex = 0;
 const game = new Phaser.Game({
@@ -18,7 +20,7 @@ const game = new Phaser.Game({
   input: { activePointers: 3 },
   render: { antialias: true, roundPixels: false },
   fps: { target: 60 },
-  scene: [BootScene, MenuScene, PlayScene],
+  scene: [BootScene, MenuScene, PlayScene, AdventureScene],
 });
 const app = new App(game);
 // Updates are offered between hunts; no automatic reload mid-run.
@@ -36,6 +38,10 @@ const update = registerSW({
 });
 // Read-only diagnostics support smoke tests without cheating controls in production.
 Object.assign(window, {
+  adventureDiagnostics: () => {
+    const adventure = game.scene.getScene("Adventure") as AdventureScene;
+    return adventure.sim ? adventure.diagnostics() : null;
+  },
   rexDiagnostics: () => {
     const play = game.scene.getScene("Play") as PlayScene;
     const sim = play.sim;

@@ -2,6 +2,7 @@ import { SaveStore, mergeProgress } from "./storage";
 import { validateProfile, validateProgress } from "./validation";
 import { reconcile } from "./sync-plan";
 import { firebaseConfig } from "./firebase-config";
+import { mergeAdventure, validateAdventure } from "../adventure/save";
 /** Lazy cloud adapter. Local play/saves never wait for connectivity. */
 export async function connectSync(
   store: SaveStore,
@@ -78,9 +79,14 @@ export async function connectSync(
             tx.set(ref, data as Record<string, unknown>);
             tx.delete(dbApi.doc(db, "tinyrex", "profile_" + id));
             tx.delete(dbApi.doc(db, "tinyrex", "progress_" + id));
+            tx.delete(dbApi.doc(db, "tinyrex", "adventure_v1_" + id));
             return;
           }
-          const id = key.startsWith("profile_") ? key.slice(8) : key.slice(9);
+          const id = key.startsWith("adventure_v1_")
+            ? key.slice(13)
+            : key.startsWith("profile_")
+              ? key.slice(8)
+              : key.slice(9);
           const [current, tombstone] = await Promise.all([
             tx.get(ref),
             tx.get(dbApi.doc(db, "tinyrex", "deleted_" + id)),
@@ -92,6 +98,14 @@ export async function connectSync(
             if (!incoming || (remote && remote.updated >= incoming.updated))
               return;
             tx.set(ref, { ...incoming });
+          } else if (key.startsWith("adventure_v1_")) {
+            const incoming = validateAdventure(data);
+            tx.set(
+              ref,
+              current.exists()
+                ? mergeAdventure(validateAdventure(current.data()), incoming)
+                : incoming,
+            );
           } else if (key.startsWith("progress_")) {
             const incoming = validateProgress(data);
             tx.set(

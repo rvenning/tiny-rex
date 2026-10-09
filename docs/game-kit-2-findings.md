@@ -1,5 +1,16 @@
 # What rebuilding Tiny Rex taught us
 
+## Connected adventure follow-up, 9 October 2026
+
+An additive adventure scene can reuse the profile, audio, accessible modal and
+PWA boundary while keeping rules independent of Phaser. Its permanent growth,
+unlocks and last-session position need a different save contract from best-score
+records: monotonic fields merge with max/union, while the complete session
+snapshot follows its timestamp. Deletion tombstones must protect both contracts.
+This remains application code; it does not justify extracting a universal quest
+or world system into Game Kit. Browser emulation checks layout/input, while
+physical-device performance and human playtesting remain separate release gates.
+
 ## Recommendation
 
 **Conditional yes: use Phaser 4 for future 2D games.** This rebuild demonstrates

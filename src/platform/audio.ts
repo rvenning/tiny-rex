@@ -41,6 +41,26 @@ export class Audio {
     };
   }
   play(kind: string, tier = 1) {
+    if (kind === "bite") {
+      this.tone(180, 0.07, 0, "sawtooth", 0.035);
+      this.tone(95, 0.08, 0.035, "triangle", 0.05);
+      return;
+    }
+    if (kind === "roar") {
+      this.tone(100, 0.35, 0, "sawtooth", 0.045);
+      this.tone(65, 0.3, 0.08, "triangle", 0.06);
+      return;
+    }
+    if (kind === "dodge") {
+      this.tone(700, 0.07, 0, "sine", 0.025);
+      this.tone(1100, 0.09, 0.035, "sine", 0.02);
+      return;
+    }
+    if (kind === "tell") {
+      this.tone(230, 0.12, 0, "triangle", 0.04);
+      this.tone(310, 0.13, 0.06, "triangle", 0.035);
+      return;
+    }
     if (kind === "grow" || kind === "win") {
       [392, 494, 588, 784].forEach((f, i) =>
         this.tone(f * Math.pow(1.03, tier), 0.22, i * 0.075),

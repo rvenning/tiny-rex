@@ -1,5 +1,34 @@
 # Tiny Rex: Phaser discovery and migration
 
+## Isometric adventure branch, 9 October 2026
+
+After Robert approved the visual/gameplay proposal, `feature/isometric-adventure`
+adds a separate pure simulation and Phaser scene for a six-region connected world.
+The original Endless Feast remains playable. Adventure saves use an additive
+versioned record and preserve legacy progress. Rules tests cover growth, combat,
+gates, species and deterministic actors; adapter tests cover concurrent merges,
+tombstones and corrupt-save recovery. See [development notes](isometric-adventure.md)
+for controls, asset production and the remaining release work.
+
+Blender source models and render/pack scripts are committed with WebP exports.
+Concept mockups were approved and saved in Notion; production art is still less
+detailed. Current combined texture-pixel estimate is about 91.6 MiB, including
+retained classic/menu art. This is not total GPU/process memory. Headless browser
+FPS under concurrent tests does not establish desktop or physical iPad performance.
+Live cloud writes and physical iPad testing remain unverified.
+
+Validation for this iteration: 48 rules/save tests pass; production build passes;
+full browser suite reports 44 passed and two existing WebKit offline skips.
+Windows WebKit composited screenshots omit the resized WebGL canvas, matching
+[Playwright issue 42885](https://github.com/microsoft/playwright/issues/42885).
+A test-only preserved-buffer diagnostic produces the actual rendered world and
+checks pixel diversity; it does not replace physical Safari visual review.
+The two additional rendered-pixel checks pass in Chromium and WebKit.
+An isolated 12-second idle sample in headless Chromium forced to the desktop
+GTX 1070 / ANGLE D3D11 reports about 59 FPS at 1024×768. Default headless
+SwiftShader is much slower. This short idle sample does not establish sustained
+combat performance or any iPad result.
+
 ## Source and strategy
 
 Source: Robert's local `D:/OneDrive/Documents/Claude Code/tiny-rex`, commit

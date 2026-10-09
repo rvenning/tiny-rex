@@ -125,6 +125,8 @@ export class SaveStore {
     );
     try {
       localStorage.removeItem("trex_progress_" + id);
+      localStorage.removeItem("trex_adventure_v1_" + id);
+      localStorage.removeItem("trex_adventure_v1_" + id + "_backup");
     } catch {}
     const s = this.settings;
     if (s.lastProfile === id)

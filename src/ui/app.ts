@@ -10,6 +10,17 @@ import { PlayScene } from "../scenes/PlayScene";
 import type { Result } from "../game/types";
 import { esc } from "./markup";
 import { AVATARS, matchesProfilePin } from "../platform/validation";
+import { AdventureScene } from "../scenes/AdventureScene";
+import { AdventureStore } from "../adventure/save";
+import {
+  REGIONS,
+  CREATURES,
+  STAGES,
+  nest,
+  byRegion,
+} from "../adventure/content";
+import { presentation } from "../game/config";
+import { adventureMap } from "./screens/adventure-map";
 type InstallEvent = Event & {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: string }>;
@@ -23,12 +34,23 @@ export class App {
   private install?: InstallEvent;
   readonly store = new SaveStore();
   readonly audio = new Audio();
+  readonly adventures = new AdventureStore();
   constructor(private game: Phaser.Game) {
     this.audio.enabled = this.store.settings.sound !== false;
     game.registry.set("audio", this.audio);
     game.registry.set("reducedMotion", this.reducedMotion);
     window.addEventListener("rex-ready", () => this.splash());
     window.addEventListener("rex-pause", () => this.pause());
+    window.addEventListener("rex-adventure-pause", () => this.adventurePause());
+    window.addEventListener("rex-adventure-journal", () =>
+      this.adventureJournal(),
+    );
+    window.addEventListener("rex-adventure-nest", () => this.adventureNest());
+    window.addEventListener("rex-adventure-save", ((event: CustomEvent) =>
+      this.store.onSave(
+        "adventure_v1_" + event.detail.id,
+        event.detail.save,
+      )) as EventListener);
     window.addEventListener("rex-end", ((e: CustomEvent<Result>) =>
       this.results(e.detail)) as EventListener);
     window.addEventListener("beforeinstallprompt", (e) => {
@@ -106,6 +128,7 @@ export class App {
     return `<footer><span data-sync>${esc(this.syncStatus)}</span>${this.button(this.audio.enabled ? "Sound on" : "Sound off", "sound", undefined, "quiet small")}${this.button("Help & install", "help", undefined, "quiet small")}</footer>`;
   }
   splash() {
+    this.stopAdventure();
     this.game.scene.stop("Play");
     if (!this.game.scene.isActive("Menu")) this.game.scene.start("Menu");
     const last = this.store.profiles.find(
@@ -117,6 +140,7 @@ export class App {
     );
   }
   profiles() {
+    this.stopAdventure();
     this.game.scene.stop("Play");
     if (!this.game.scene.isActive("Menu")) this.game.scene.start("Menu");
     this.shell(
@@ -176,6 +200,7 @@ export class App {
   }
   map() {
     if (!this.profile) return this.profiles();
+    this.stopAdventure();
     this.game.scene.stop("Play");
     if (!this.game.scene.isActive("Menu")) this.game.scene.start("Menu");
     const progress = this.store.progress(this.profile.id);
@@ -190,9 +215,13 @@ export class App {
         this.footer(),
       ),
     );
+    const adventureCard = this.ui.querySelector(".adventure-card");
+    if (adventureCard)
+      this.ui.querySelector(".page-heading")?.after(adventureCard);
   }
   private start() {
     if (!this.profile) return;
+    this.stopAdventure();
     this.game.registry.set("reducedMotion", this.reducedMotion);
     this.game.scene.stop("Menu");
     this.game.scene.stop("Play");
@@ -297,7 +326,8 @@ export class App {
     focus?.focus();
     div.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
-        if (this.screen === "playing") this.action("resume");
+        if (this.screen === "adventure") this.action("adventure-resume");
+        else if (this.screen === "playing") this.action("resume");
         else this.action("close");
       }
       if (e.key === "Tab") {
@@ -328,6 +358,36 @@ export class App {
   private action(action: string, value?: string) {
     const play = () => this.game.scene.getScene("Play") as PlayScene;
     switch (action) {
+      case "adventure":
+        this.startAdventure();
+        break;
+      case "adventure-resume":
+        document.querySelector(".modal-backdrop")?.remove();
+        this.adventureScene().resumeAdventure();
+        break;
+      case "adventure-journal":
+        this.adventureJournal();
+        break;
+      case "adventure-nest":
+        this.adventureNest();
+        break;
+      case "adventure-species":
+        this.adventureScene().sim.switchSpecies(
+          value as "rex" | "raptor" | "trike",
+        );
+        this.adventureScene().persist();
+        this.adventureNest();
+        break;
+      case "adventure-assist":
+        this.adventureScene().sim.save.assist =
+          !this.adventureScene().sim.save.assist;
+        this.adventureScene().persist();
+        this.adventurePause();
+        break;
+      case "adventure-quit":
+        this.stopAdventure();
+        this.map();
+        break;
       case "splash":
         this.splash();
         break;
@@ -404,5 +464,58 @@ export class App {
         void this.install?.prompt();
         break;
     }
+  }
+  private adventureScene() {
+    return this.game.scene.getScene("Adventure") as AdventureScene;
+  }
+  private stopAdventure() {
+    if (
+      this.game.scene.isActive("Adventure") ||
+      this.game.scene.isPaused("Adventure")
+    )
+      this.game.scene.stop("Adventure");
+    document.body.classList.remove("adventure-mode");
+    this.game.scale.setGameSize(
+      presentation.width * presentation.renderScale,
+      presentation.height * presentation.renderScale,
+    );
+  }
+  private startAdventure() {
+    if (!this.profile) return;
+    this.game.scene.stop("Menu");
+    this.game.scene.stop("Play");
+    this.game.registry.set("reducedMotion", this.reducedMotion);
+    this.shell("adventure", "");
+    document.body.classList.add("adventure-mode");
+    this.game.scale.setGameSize(innerWidth, innerHeight);
+    this.game.scene.start("Adventure", {
+      profileId: this.profile.id,
+      save: this.adventures.read(this.profile.id),
+    });
+    document.getElementById("stage")!.focus();
+  }
+  private adventurePause() {
+    if (this.screen !== "adventure") return;
+    const a = this.adventureScene().sim;
+    this.modal(
+      `<p class="eyebrow">YOUR WORLD CAN WAIT</p><h2>Take a breather.</h2><p>Your growth and discoveries are saved.</p>${this.button("Continue exploring →", "adventure-resume", undefined, "primary big")}${this.button("Map & creature book", "adventure-journal", undefined, "quiet")}${this.button(a.save.assist ? "Assisted hunts on" : "Assisted hunts off", "adventure-assist", undefined, "quiet")}<p class="hint">Assisted hunts give longer tells and gentler damage. Rewards stay the same.</p>${this.button("Save & return home", "adventure-quit", undefined, "quiet")}`,
+    );
+  }
+  private adventureJournal() {
+    if (this.screen !== "adventure") return;
+    const a = this.adventureScene().sim;
+    this.modal(
+      `<p class="eyebrow">THE WORLD JOURNAL</p><h2>${esc(a.objective)}</h2>${adventureMap(a.save, a.player)}<div class="adventure-journal-grid">${REGIONS.map((r) => `<section class="journal-region ${a.save.regions.includes(r.id) ? "known" : ""}"><b>${esc(r.name)}</b><p>${a.save.regions.includes(r.id) ? esc(r.description) : STAGES[r.required] + " route · unexplored"}</p><small>${a.save.nests.includes(r.id) ? "Refuge found" : "Find the refuge"} · ${a.save.discoveries.filter((d) => d.startsWith("fossil-" + r.id)).length}/3 fossils</small></section>`).join("")}</div><h3>Creature book</h3><div class="adventure-book">${CREATURES.map((c) => `<p><b>${a.save.studied.includes(c.id) ? esc(c.name) : "Undiscovered creature"}</b><small>${a.save.studied.includes(c.id) ? esc(c.fact) : "Watch and approach to learn more."}</small></p>`).join("")}</div><p>${a.save.challenges.length} optional discoveries & clean hunts · ${a.save.rivals.length}/3 rival encounters</p>${this.button("Continue exploring →", "adventure-resume", undefined, "primary")}`,
+    );
+  }
+  private adventureNest() {
+    if (this.screen !== "adventure") return;
+    const a = this.adventureScene().sim;
+    const n = nest(byRegion(a.region));
+    if (Math.hypot(a.player.x - n.x, a.player.y - n.y) > 100)
+      return this.adventurePause();
+    this.modal(
+      `<p class="eyebrow">A SAFE PLACE TO RETURN</p><h2>${esc(byRegion(a.region).name)} nest</h2><p>Choose how to explore. Each dinosaur keeps its own growth.</p><div class="nest-species">${(["rex", "raptor", "trike"] as const).map((d) => this.button(`${d === "trike" ? "Triceratops" : d === "raptor" ? "Raptor" : "Rex"}<small>${d === "rex" ? "Power · roar & heavy bite" : d === "raptor" ? "Speed · flank & pounce" : "Defence · forage & charge"}</small>`, "adventure-species", d, d === a.dino ? "primary" : "quiet", !a.save.species.includes(d))).join("")}</div><p class="hint">Raptor egg: Reed Marsh · Triceratops egg: Ember Basin</p>${this.button("Continue exploring →", "adventure-resume", undefined, "primary")}`,
+    );
   }
 }
