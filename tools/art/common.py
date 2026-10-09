@@ -228,6 +228,7 @@ def link(obj, collection=None):
 
 
 def render_to(scene, path):
+    path = os.path.abspath(path)
     os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
     scene.render.filepath = path
     bpy.ops.render.render(write_still=True)

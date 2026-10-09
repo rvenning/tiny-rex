@@ -1,7 +1,10 @@
-import type { Dino, RegionId, Point } from "./content";
-import { REGIONS, CREATURES, DISCOVERIES, nest, byRegion } from "./content";
+import type { Dino, RegionId, Point } from "./data";
+import { REGIONS, CREATURES, DISCOVERIES, RIVALS, byRegion } from "./data";
+/** world: 2 = the connected-world rebuild (unit coordinates, 8/30/90/200 growth). Older draft saves restart cleanly. */
+export const WORLD_VERSION = 2;
 export interface AdventureSave {
   version: 1;
+  world: 2;
   xp: Record<Dino, number>;
   species: Dino[];
   discoveries: string[];
@@ -17,6 +20,7 @@ export interface AdventureSave {
 }
 export const freshAdventure = (): AdventureSave => ({
   version: 1,
+  world: 2,
   xp: { rex: 0, raptor: 0, trike: 0 },
   species: ["rex"],
   discoveries: [],
@@ -28,7 +32,7 @@ export const freshAdventure = (): AdventureSave => ({
   gates: [],
   snapshot: {
     dino: "rex",
-    position: nest(byRegion("hollow")),
+    position: { ...byRegion("hollow").nest },
     nest: "hollow",
     at: 0,
   },
@@ -55,7 +59,9 @@ const record = (v: unknown): Record<string, unknown> =>
     ? (v as Record<string, unknown>)
     : {};
 export function validateAdventure(value: unknown): AdventureSave {
-  const p = record(value),
+  const raw = record(value);
+  // draft-era records used a different coordinate system and growth scale; start those clean
+  const p = raw.world === WORLD_VERSION || value == null ? raw : {},
     xp = record(p.xp),
     snap = record(p.snapshot),
     pos = record(snap.position),
@@ -84,15 +90,18 @@ export function validateAdventure(value: unknown): AdventureSave {
       ),
     ]),
   ] as RegionId[];
-  a.rivals = list(p.rivals, ["river-hunter", "marsh-pack", "basalt-matriarch"]);
+  a.rivals = list(
+    p.rivals,
+    RIVALS.map((r) => r.id).concat(["marsh-pack", "basalt-matriarch"]),
+  );
   a.studied = list(
     p.studied,
     CREATURES.map((c) => c.id),
   );
   a.challenges = list(p.challenges, [
-    "clean-river",
-    "clean-marsh",
-    "clean-ember",
+    "clean-river-hunter",
+    "clean-marsh-pack",
+    "clean-basalt-matriarch",
     "egg-rescue",
     "trail-hollow",
     "trail-river",
@@ -128,12 +137,12 @@ export function validateAdventure(value: unknown): AdventureSave {
       typeof pos.y === "number" &&
       Number.isFinite(pos.x) &&
       Number.isFinite(pos.y) &&
-      pos.x >= 25 &&
-      pos.x <= 2675 &&
-      pos.y >= 25 &&
-      pos.y <= 1775
+      pos.x >= -18 &&
+      pos.x <= 88 &&
+      pos.y >= -18 &&
+      pos.y <= 88
         ? { x: pos.x, y: pos.y }
-        : nest(byRegion(savedNest)),
+        : { ...byRegion(savedNest).nest },
     at: num(snap.at, Number.MAX_SAFE_INTEGER),
   };
   a.updated = num(p.updated, Number.MAX_SAFE_INTEGER);
@@ -172,7 +181,7 @@ export class AdventureStore {
         const value = JSON.parse(
           localStorage.getItem("trex_adventure_v1_" + id + suffix) || "null",
         );
-        if (value?.version === 1) return validateAdventure(value);
+        if (value?.version === 1 && value?.world === WORLD_VERSION) return validateAdventure(value);
       } catch {}
     }
     return freshAdventure();
