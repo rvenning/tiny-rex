@@ -8,3 +8,4 @@ art-build/
 __pycache__/
 *.blend1
 art-reference/
+docs/review/*.png

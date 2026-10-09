@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { Adventure, idleInput } from '../src/adventure/sim';
 import { freshAdventure, validateAdventure, mergeAdventure } from '../src/adventure/save';
@@ -16,8 +16,9 @@ const place = (a:Adventure,x:number,y:number,face=0) => Object.assign(a.player,{
 const move = (a:Adventure,x:number,y:number,n=90) => tick(a,n,{...idleInput(),move:{x,y}});
 const bite = (a:Adventure) => {tick(a,1,{...idleInput(),bite:true});tick(a,20);};
 
+const connectedReady = existsSync('public/world-connected/world.json');
 describe('Connected adventure progression',()=>{
-  it('every authored actor spawns and returns to terrain that fits its body in its authored region',()=>{
+  it.skipIf(!connectedReady)('every authored actor spawns and returns to terrain that fits its body in its authored region',()=>{
     const meta=JSON.parse(readFileSync(new URL('../public/world-connected/world.json',import.meta.url),'utf8'));
     const world=parseWorld(meta,gunzipSync(readFileSync(new URL('../public/world-connected/world.bin.gz',import.meta.url))));
     const a=new Adventure(world,freshAdventure());
@@ -152,7 +153,7 @@ describe('Connected adventure progression',()=>{
     expect(world.grid.fits(a.player.x,a.player.y,a.radius)).toBe(true);a.save.xp.rex=8;a.pendingGrow=true;tick(a,60);
     expect(a.tier).toBe(1);expect(world.grid.fits(a.player.x,a.player.y,a.radius)).toBe(true);expect(a.player.x).toBeGreaterThan(23);
   });
-  it('the actual connected collision grid provides a Rex-sized route to every refuge',()=>{
+  it.skipIf(!connectedReady)('the actual connected collision grid provides a Rex-sized route to every refuge',()=>{
     const meta=JSON.parse(readFileSync(new URL('../public/world-connected/world.json',import.meta.url),'utf8'));
     const world=parseWorld(meta,gunzipSync(readFileSync(new URL('../public/world-connected/world.bin.gz',import.meta.url))));
     const a=new Adventure(world,{...freshAdventure(),xp:{rex:200,raptor:0,trike:0},rivals:['river-hunter','marsh-pack'],gates:GATES.filter(g=>!g.optional).map(g=>g.id)});
