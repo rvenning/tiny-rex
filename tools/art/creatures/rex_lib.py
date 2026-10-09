@@ -1421,7 +1421,7 @@ def skin_material(rex):
     # mouth / nostrils / scars
     col = g.mix(mouth, col, g.mix(g.noise(rest, 14.0), srgb("#8E2F38"), srgb("#B9505A")))
     col = g.mix(g.math("MULTIPLY", nost, 0.85), col, srgb("#1C2A22"))
-    col = g.mix(g.math("MULTIPLY", scar, 0.9), col, srgb("#E7C9A6"))
+    col = g.mix(g.math("MULTIPLY", scar, 0.38), col, srgb("#C4A56E"))
     # crevice darkening with a cool teal tint (AO)
     ao = g.n("ShaderNodeAmbientOcclusion", samples=8)
     ao.inputs["Distance"].default_value = 0.06 * L / 4.2 + 0.04
@@ -1439,7 +1439,7 @@ def skin_material(rex):
     bump2 = g.n("ShaderNodeBump")
     bump2.inputs["Strength"].default_value = 0.2
     bump2.inputs["Distance"].default_value = 0.02 * L / 4.2
-    g.put(bump2.inputs["Height"], g.math("MULTIPLY", scar, -1.0))
+    g.put(bump2.inputs["Height"], g.math("MULTIPLY", scar, -0.45))
     g.put(bump2.inputs["Normal"], bump.outputs["Normal"])
     rough = g.mr(n2, 0.3, 0.7, 0.52, 0.70)
     g.bsdf(**{"Base Color": col, "Roughness": rough, "Normal": bump2.outputs["Normal"], "Subsurface Weight": 0.08,
