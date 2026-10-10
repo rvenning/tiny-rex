@@ -598,7 +598,7 @@ export class AdventureScene extends Phaser.Scene {
       const z = g.height(a.x, a.y);
       v.hidden = a.state === "dormant";
       v.glowColor = a.spec.archetype === "boss" || a.spec.archetype === "miniboss" ? 0xff5a3c : a.elite ? 0xffd36a : a.fx.poison ? 0x9be05c : a.fx.bleed ? 0xff4a4a : null;
-      v.glowAlpha = a.spec.archetype === "boss" ? 0.18 : 0.14;
+      v.glowAlpha = a.spec.archetype === "boss" || a.spec.archetype === "miniboss" ? 0.07 : 0.08;
       v.scale = a.spec.scale * (a.elite ? 1.18 : 1);
       v.update(dt, a.x, a.y, z, a.face, this.poseFor(a), undefined, a.flash);
       this.drawCue(a, z);
