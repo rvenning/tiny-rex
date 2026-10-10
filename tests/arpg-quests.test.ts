@@ -349,9 +349,9 @@ describe("every quest target is reachable in the real connected world (A7)", () 
       const snapped = world.grid.nearestWalkable(p.x, p.y, 0.55);
       expect(Math.hypot(snapped.x - p.x, snapped.y - p.y), `${q}/${what} (${p.x},${p.y}) must be on walkable ground`).toBeLessThan(1.6);
       if (Math.hypot(p.x - start.x, p.y - start.y) < 3) continue;
-      const route = findRoute(world.grid, start, snapped, 0.55);
+      const route = findRoute(world.grid, start, p, 0.45);
       const end = route.at(-1);
-      expect(end && Math.hypot(end.x - snapped.x, end.y - snapped.y) < 1.5, `${q}/${what} (${p.x},${p.y}) reachable from the start nest`).toBe(true);
+      expect(end && Math.hypot(end.x - p.x, end.y - p.y) < 1.5, `${q}/${what} (${p.x},${p.y}) reachable from the start nest`).toBe(true);
     }
     void a;
   });

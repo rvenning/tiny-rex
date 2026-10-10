@@ -4,7 +4,12 @@ import type { Point } from "./data";
 /** A* over the real collision grid with a half-unit lattice and a hatchling-sized body: the route the objective arrow follows.
  *  Growth gates are not modelled here; the arrow only answers "which way is the path", the sim explains any gate.
  *  A binary heap keeps long routes (the whole valley) cheap enough to re-plan every second or so. */
-export function findRoute(grid: WorldGrid, from: Point, to: Point, radius = 0.45, S = 0.5): Point[] {
+export function findRoute(grid: WorldGrid, from: Point, to: Point, radius = 0.45): Point[] {
+  // a half-unit lattice is quick; narrow pinches (the ford, root gaps) need the quarter-unit lattice the collision grid really uses
+  const coarse = searchRoute(grid, from, to, radius, 0.5);
+  return coarse.length ? coarse : searchRoute(grid, from, to, radius, 0.25);
+}
+function searchRoute(grid: WorldGrid, from: Point, to: Point, radius: number, S: number): Point[] {
   const x0 = grid.x0,
     y0 = grid.y0,
     nx = Math.ceil((grid.nx * grid.cell) / S),
@@ -69,13 +74,16 @@ export function findRoute(grid: WorldGrid, from: Point, to: Point, radius = 0.45
   };
   const goal = key(b.ix, b.iy);
   let found = false,
-    guard = 0;
+    guard = 0,
+    reached = goal;
   const closed = new Set<number>();
   while (heap.length && guard++ < 400000) {
     const [, cur] = pop();
     if (closed.has(cur)) continue;
     closed.add(cur);
-    if (cur === goal) {
+    // close enough counts: the target itself may sit on a ledge just off the walkable lattice
+    if (cur === goal || Math.hypot(cx(cur % nx) - to.x, cy(Math.floor(cur / nx)) - to.y) < 0.9) {
+      reached = cur;
       found = true;
       break;
     }
@@ -99,7 +107,7 @@ export function findRoute(grid: WorldGrid, from: Point, to: Point, radius = 0.45
   }
   if (!found) return [];
   const path: Point[] = [];
-  for (let k: number | undefined = goal; k !== undefined; k = came.get(k)) path.push({ x: cx(k % nx), y: cy(Math.floor(k / nx)) });
+  for (let k: number | undefined = reached; k !== undefined; k = came.get(k)) path.push({ x: cx(k % nx), y: cy(Math.floor(k / nx)) });
   path.reverse();
   // thin the polyline: keep a point every ~3 units plus the ends
   const every = Math.max(1, Math.round(3 / S));

@@ -239,3 +239,54 @@ export const HOLLOW_QUESTS: QuestDef[] = [
     ],
   },
 ];
+
+/** Extra Hollow encounters (levels 2–5): a raider pack on the east trail, a caller behind a raptor, a lurker on the south trail. */
+export const HOLLOW_SPAWNS: [string, number, number, number?][] = [
+  ["compy-raider", 52, 34, 2],
+  ["compy-raider", 53.2, 33.2, 2],
+  ["compy-raider", 52.6, 35, 2],
+  ["raptor", 59, 33.4, 4],
+  ["caller", 62.5, 33.6, 4],
+  ["lurker", 24, 47, 3],
+  ["oviraptor", 44.8, 41.2, 4],
+];
+
+export const HOLLOW_SIDE_QUESTS: QuestDef[] = [
+  {
+    id: "pip-count",
+    title: "Pip’s Very Important Count",
+    kind: "side",
+    region: "hollow",
+    level: 2,
+    giver: "pip",
+    requires: { quests: ["quiet-nest"] },
+    summary: "Pip is writing the first Complete Map of Fern Hollow and needs a big dinosaur to check the corners.",
+    offer: [
+      { speaker: "Pip", text: "Big news. I'm making a MAP. Of everything. The complete valley, in my head, which is where the best maps live." },
+      { speaker: "Pip", text: "Problem: I got scared at the ford, and again at the fossil shelf, and a third time at the egg nest, and I may have made up some of it. Would you go check? Walk to each place. Report back. Don't tell the beetles." },
+    ],
+    steps: [
+      {
+        type: "collect",
+        text: "Check Pip's landmarks: the old perch, the fossil shelf, the egg nest",
+        label: "Landmark confirmed",
+        items: [
+          { x: 42.5, y: 35.2 },
+          { x: 46.2, y: 15.6 },
+          { x: 46.6, y: 40.2 },
+        ],
+      },
+      {
+        type: "talk",
+        npc: "pip",
+        text: "Tell Pip what you found",
+        dialogue: [
+          { speaker: "Pip", text: "The ford is where I said it was? And the shelf? And the nest has EGGS in it? Incredible. I was right about three whole things." },
+          { speaker: "Pip", text: "Here. Payment. It's from the bottom of my pocket, which is also where I keep the good stuff. Scout's honour. Quietly." },
+        ],
+      },
+    ],
+    reward: { xp: 90, amber: 25, loot: { rarity: "common" }, text: "Pip's map is complete (mostly)" },
+    after: [{ speaker: "Pip", text: "I've added you to the map. Right in the middle. Slightly too big. Tell nobody." }],
+  },
+];

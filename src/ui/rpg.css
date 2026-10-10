@@ -271,3 +271,11 @@
 .danger { background: linear-gradient(#a8483f, #7a2c27) !important; border-color: #ffb4a6 !important; color: #fff !important; }
 
 .quest .row .button { flex: 0 0 auto; min-height: 44px; padding: 8px 18px; }
+
+.seg label small, .seg small { display: block; }
+.seg b { display: block; }
+@media (max-width: 760px) and (orientation: portrait) {
+  .hud .hud-buttons { flex-direction: column; align-items: flex-end; gap: 8px; }
+  .hud .hud-buttons .round { width: 48px; height: 48px; }
+  .hud .objective { top: calc(env(safe-area-inset-top) + 112px); }
+}

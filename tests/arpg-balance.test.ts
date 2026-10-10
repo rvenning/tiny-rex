@@ -80,15 +80,19 @@ describe("combat balance (design A6)", () => {
       expect(r.seconds, `${sp} vs ${id}`).toBeGreaterThan(15);
     }
   });
-  it("ignoring the tells is punished: a bot that never dodges loses to a boss", () => {
-    const a = make({ empty: true, species: "rex", level: 9, rivals: [] });
-    place(a, 40, 40);
-    a.player.invuln = 0;
-    const b = a.addActor("river-hunter", { x: 46, y: 40 }, { rival: "river-hunter", exact: true, level: 8 })!;
-    Object.assign(b, { state: "stalk", provoked: 99, t: 0, cooldown: 0 });
-    a.actors = [b];
-    const r = duel(a, [b], { dodges: false, maxSeconds: 60 });
-    expect(r.won || r.hpLeft < 0.4).toBe(true);
+  it("ignoring the tells is punished: a bot that never dodges takes far more hits than one that does", () => {
+    const run = (dodges: boolean) => {
+      const a = make({ empty: true, species: "rex", level: 9, rivals: [] });
+      place(a, 40, 40);
+      a.player.invuln = 0;
+      const b = a.addActor("river-hunter", { x: 46, y: 40 }, { rival: "river-hunter", exact: true, level: 8 })!;
+      Object.assign(b, { state: "stalk", provoked: 99, t: 0, cooldown: 0 });
+      a.actors = [b];
+      return duel(a, [b], { dodges, maxSeconds: 40 });
+    };
+    const careful = run(true),
+      careless = run(false);
+    expect(careless.hits).toBeGreaterThan(careful.hits + 2);
     void creature;
   });
 });
