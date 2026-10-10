@@ -267,6 +267,7 @@ describe("Mastery and encounters carry over from the connected world", () => {
       a.player.action = 0;
       bite(a);
       expect(fly.state).toBe("dead");
+      tick(a, 40); // let the combo window close so the next catch is an opening swing, not a slow finisher
     }
     expect(a.save.challenges).toContain("reed-watch");
   });
