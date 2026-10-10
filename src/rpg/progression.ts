@@ -91,8 +91,16 @@ export const enemyXp = (level: number, power: number) => Math.round((6 + 3.2 * l
 /** XP is damped against creatures far below your level so farming the starter area stops paying */
 export const xpDamping = (playerLevel: number, enemyLevel: number) => (playerLevel - enemyLevel <= 2 ? 1 : Math.max(0.15, 1 - 0.22 * (playerLevel - enemyLevel - 2)));
 
-export const DIFFICULTY = {
+export interface DiffSettings {
+  taken: number;
+  tell: number;
+  enemyHp: number;
+  xp: number;
+  loot: number;
+  aim: number;
+}
+export const DIFFICULTY: Record<"gentle" | "standard" | "fierce", DiffSettings> = {
   gentle: { taken: 0.6, tell: 1.3, enemyHp: 0.9, xp: 1, loot: 1, aim: 1.15 },
   standard: { taken: 1, tell: 1, enemyHp: 1, xp: 1, loot: 1, aim: 0.7 },
   fierce: { taken: 1.25, tell: 1, enemyHp: 1.25, xp: 1.2, loot: 1.2, aim: 0.7 },
-} as const;
+};
