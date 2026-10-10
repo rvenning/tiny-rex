@@ -279,7 +279,8 @@ def build_ground_material():
     c_grav = T.mix(peb.outputs["Position"] if False else T.math("MULTIPLY", peb.outputs["Distance"], 1.0), (0.38, 0.33, 0.26), (0.20, 0.17, 0.14))
     c_grav = T.mix(T.math("MULTIPLY", fine, 0.8), c_grav, (0.50, 0.46, 0.38))
     c_sand = T.mix(mid, (0.50, 0.36, 0.17), (0.66, 0.50, 0.26))
-    c_bas = T.mix(mid, (0.025, 0.022, 0.03), (0.07, 0.06, 0.07))
+    c_bas = T.mix(mid, (0.030, 0.022, 0.027), (0.105, 0.075, 0.07))
+    c_bas = T.mix(T.math("MINIMUM", T.math("MAXIMUM", T.math("MULTIPLY", T.math("SUBTRACT", T.noise(pos, 0.8, 3, 0.55), 0.55), 4.0), 0.0), 1.0), c_bas, (0.20, 0.17, 0.16))
     c_ash = T.mix(mid, (0.10, 0.10, 0.10), (0.2, 0.19, 0.18))
     cols = {
         "grass": c_grass, "dirt": c_dirt, "moss": c_moss, "rock": c_rock, "mud": c_mud,
@@ -332,6 +333,12 @@ def build_ground_material():
     # bump
     height = T.math("ADD", T.math("MULTIPLY", fine, 0.5), T.math("MULTIPLY", grit, 0.25))
     height = T.math("ADD", height, T.math("MULTIPLY", T.math("SUBTRACT", 1.0, T.math("MINIMUM", cr2.outputs["Distance"], 1.0)), 0.25))
+    # wind ripples on sand: long crests with a wobble
+    psep = T.node("ShaderNodeSeparateXYZ")
+    T.link(pos, psep.inputs[0])
+    ripple_phase = T.math("ADD", T.math("ADD", T.math("MULTIPLY", psep.outputs["X"], 3.2), T.math("MULTIPLY", psep.outputs["Y"], 1.6)), T.math("MULTIPLY", mid, 7.0))
+    ripple = T.math("MULTIPLY", T.math("ADD", T.math("SINE", ripple_phase), 1.0), 0.5)
+    height = T.math("ADD", height, T.math("MULTIPLY", ripple, T.math("MULTIPLY", W["sand"], 0.9)))
     bump = T.node("ShaderNodeBump")
     bump.inputs["Strength"].default_value = 0.8
     bump.inputs["Distance"].default_value = 0.10
@@ -344,10 +351,19 @@ def build_ground_material():
     bsdf.inputs["Specular IOR Level"].default_value = 0.25
     # lava glow
     em = T.node("ShaderNodeEmission")
-    em.inputs["Color"].default_value = (1.0, 0.32, 0.03, 1)
-    em.inputs["Strength"].default_value = 8.0
+    em.inputs["Color"].default_value = (1.0, 0.22, 0.015, 1)
+    em.inputs["Strength"].default_value = 5.0
+    # glowing fissures through the cooled basalt: edges of large voronoi plates, patchy, orange-hot
+    fis = T.node("ShaderNodeTexVoronoi", voronoi_dimensions="3D", feature="DISTANCE_TO_EDGE")
+    fis.inputs["Scale"].default_value = 0.42
+    T.link(pos, fis.inputs["Vector"])
+    fis_w = T.noise(pos, 0.35, 3, 0.55)
+    crack = T.math("SUBTRACT", 1.0, T.math("MINIMUM", T.math("DIVIDE", fis.outputs["Distance"], 0.022), 1.0))
+    patchy = T.math("MINIMUM", T.math("MAXIMUM", T.math("MULTIPLY", T.math("SUBTRACT", fis_w, 0.48), 5.0), 0.0), 1.0)
+    glow = T.math("MULTIPLY", T.math("MULTIPLY", crack, patchy), T.math("MINIMUM", T.math("MULTIPLY", W["basalt"], 1.4), 1.0))
+    mixf = T.math("MAXIMUM", T.math("MINIMUM", T.math("MULTIPLY", W["lava"], 2.0), 1.0), T.math("MINIMUM", T.math("MULTIPLY", glow, 1.6), 1.0))
     mixs = T.node("ShaderNodeMixShader")
-    T.link(T.math("MINIMUM", T.math("MULTIPLY", W["lava"], 2.0), 1.0), mixs.inputs[0])
+    T.link(mixf, mixs.inputs[0])
     T.link(bsdf.outputs[0], mixs.inputs[1])
     T.link(em.outputs[0], mixs.inputs[2])
     out = T.node("ShaderNodeOutputMaterial")
