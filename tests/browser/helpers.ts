@@ -7,12 +7,13 @@ export const reviewProfile = {
   created: 1,
   updated: 1,
 };
-export async function isolate(page: Page, pin: string | null = null) {
+/** seed one ready-made character (named like the profile so "Continue as Adventure Rex" finds it) unless the test needs a fresh profile */
+export async function isolate(page: Page, pin: string | null = null, seedCharacter = true) {
   // Keep each checkpoint stable while the art pipeline publishes files into public/.
   await page.routeWebSocket("**", (socket) => socket.close());
   await page.route(/googleapis|firebaseapp|gstatic/, (route) => route.abort());
   await page.addInitScript(
-    ({ profile, pin }) => {
+    ({ profile, pin, seedCharacter }) => {
       if (sessionStorage.getItem("rebuild-review")) return;
       sessionStorage.setItem("rebuild-review", "yes");
       localStorage.clear();
@@ -24,6 +25,10 @@ export async function isolate(page: Page, pin: string | null = null) {
         "trex_settings",
         JSON.stringify({ sound: false, lastProfile: profile.id }),
       );
+      if (seedCharacter) {
+        const c = { version: 2, id: "c-review", name: "Adventure Rex", species: "rex", created: 1, updated: 1, rev: 1 };
+        localStorage.setItem("trex_chars_v2_" + profile.id, JSON.stringify({ version: 2, active: c.id, characters: { [c.id]: c }, trash: [], updated: 1 }));
+      }
       localStorage.setItem(
         "trex_progress_" + profile.id,
         JSON.stringify({
@@ -33,7 +38,7 @@ export async function isolate(page: Page, pin: string | null = null) {
         }),
       );
     },
-    { profile: reviewProfile, pin },
+    { profile: reviewProfile, pin, seedCharacter },
   );
 }
 export async function start(page: Page) {

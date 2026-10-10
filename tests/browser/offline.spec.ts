@@ -19,6 +19,6 @@ test('first-install cache can reopen a fully rendered adventure offline', async 
   await context.setOffline(true);
   await start(page);
   await terrainVisible(page);
-  await expect(page.locator('.hud-card .stage')).toContainText('Hatchling');
+  await expect(page.locator('.hud-card .name')).toContainText('Hatchling');
   await page.screenshot({ path: test.info().outputPath('offline-gameplay.png') });
 });

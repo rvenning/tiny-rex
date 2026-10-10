@@ -63,7 +63,7 @@ export class App {
     game.registry.set("audio", this.audio);
     game.registry.set("reducedMotion", this.reducedMotion);
     document.body.classList.toggle("reduced-motion", this.reducedMotion);
-    window.addEventListener("rex-ready", () => this.splash());
+    window.addEventListener("rex-ready", () => this.screen === "loading" && this.splash());
     window.addEventListener("rex-failed", () => this.shell("loading", '<div class="loading-screen"><p class="eyebrow">TINY REX</p><h1>The valley would not wake.</h1><p>Check your connection and reload.</p></div>'));
     window.addEventListener("rex-adventure-pause", () => this.adventurePause());
     window.addEventListener("rex-adventure-nest", () => this.adventureNest());
