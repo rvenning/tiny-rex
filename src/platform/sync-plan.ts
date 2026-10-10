@@ -88,6 +88,19 @@ export function reconcile(
   store.write("deleted", [...deleted], false);
   store.write("profiles", [...byId.values()], false);
   for (const p of byId.values()) {
+    // characters: merge the cloud's per-character documents into this device's book, then queue whatever the cloud lacks
+    const localBook = characters.read(p.id, p.name);
+    const cloud = remoteBooks.get(p.id);
+    const mergedBook = cloud ? mergeBooks(localBook, cloud) : localBook;
+    if (cloud) characters.replace(p.id, mergedBook);
+    for (const c of Object.values(mergedBook.characters)) {
+      const remote = cloud?.characters[c.id];
+      if (!remote || remote.rev < c.rev || (remote.rev === c.rev && remote.updated < c.updated)) queued.set(charDocId(p.id, c.id), c);
+      else queued.delete(charDocId(p.id, c.id));
+    }
+    for (const t of mergedBook.trash) {
+      if (!cloud?.trash.some((x) => x.character.id === t.character.id)) queued.set(charDelDocId(p.id, t.character.id), { character: t.character, at: t.deletedAt });
+    }
     const localAdventure = adventureStore.read(p.id);
     const remoteAdventure = remoteAdventures.get(p.id);
     const adventure = remoteAdventure

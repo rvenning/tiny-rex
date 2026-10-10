@@ -104,7 +104,7 @@ export class App {
       this.syncStatus = s;
       const badge = document.querySelector("[data-sync]");
       if (badge) badge.textContent = s;
-    });
+    }, this.chars);
   }
   private get reducedMotion() {
     return this.store.settings.motion === false || matchMedia("(prefers-reduced-motion: reduce)").matches;
