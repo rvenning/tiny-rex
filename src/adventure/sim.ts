@@ -289,6 +289,10 @@ export class Adventure {
     this.emit("pickup", this.player, { kind: "mutation", rarity: m.rarity, text: m.name, id: m.id });
     return m;
   }
+  /** dismiss without completing (Escape during a choice): the conversation can be reopened later */
+  cancelDialogue() {
+    this.dialogue = null;
+  }
   closeDialogue(choice?: string) {
     const s = this.dialogue;
     this.dialogue = null;

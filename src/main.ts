@@ -6,6 +6,7 @@ import { MenuScene } from "./scenes/MenuScene";
 import { App } from "./ui/app";
 import "./ui/style.css";
 import "./ui/hud.css";
+import "./ui/rpg.css";
 
 /** Render resolution: crisp on retina, capped so older iPads keep a steady frame rate. */
 export function renderScale() {

@@ -3,6 +3,7 @@ import { validateProfile, validateProgress } from "./validation";
 import { reconcile } from "./sync-plan";
 import { firebaseConfig } from "./firebase-config";
 import { mergeAdventure, validateAdventure } from "../adventure/save";
+import { validateCharacter } from "../rpg/character";
 /** Lazy cloud adapter. Local play/saves never wait for connectivity. */
 export async function connectSync(
   store: SaveStore,

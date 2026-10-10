@@ -259,7 +259,7 @@ export const CREATURES: CreatureSpec[] = [
     },
   },
   // ------------------------------------------------------------------ neutral villagers (spoken to, never fought)
-  { id: "elder-trike", name: "Mossback", sprite: "trike", role: "armour", archetype: "neutral", level: 1, r: 1.0, speed: 2.4, hp: 999, power: 0, reward: 0, sense: 0, scale: 0.92, tint: 0xd9e8c4, fact: "The oldest nest-keeper in Fern Hollow." },
+  { id: "elder-trike", name: "Mossback", sprite: "trike", role: "armour", archetype: "neutral", level: 1, r: 0.9, speed: 2.4, hp: 999, power: 0, reward: 0, sense: 0, scale: 0.78, tint: 0xd9e8c4, fact: "The oldest nest-keeper in Fern Hollow." },
   { id: "scout-compy", name: "Pip", sprite: "compy", role: "armour", archetype: "neutral", level: 1, r: 0.4, speed: 3, hp: 999, power: 0, reward: 0, sense: 0, scale: 1.0, tint: 0xcfe6ff, fact: "A scout who has seen everything and will tell you twice." },
   { id: "hatchling", name: "Hatchling", sprite: "compy", role: "armour", archetype: "neutral", level: 1, r: 0.28, speed: 4.8, hp: 999, power: 0, reward: 0, sense: 0, scale: 0.62, tint: 0xfff0b0, fact: "Very new, very loud, and extremely brave." },
   { id: "elder-hypsi", name: "Old Nibble", sprite: "hypsilophodon", role: "armour", archetype: "neutral", level: 1, r: 0.5, speed: 2.6, hp: 999, power: 0, reward: 0, sense: 0, scale: 1.0, tint: 0xf0dcc0, fact: "A grazer who remembers every ford and every flood." },
