@@ -131,6 +131,8 @@ export interface Actor extends Point {
   /** boss attack counter, for alternating patterns */
   count: number;
   unaware: boolean;
+  /** a practice rematch: pays no boss loot */
+  rematch?: boolean;
   /** quest that spawned this creature (cleared when the quest ends; tagged creatures never respawn) */
   tag?: string;
   /** hatchlings that trail the player during an escort */

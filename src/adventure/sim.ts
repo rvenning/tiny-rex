@@ -92,6 +92,7 @@ export class Adventure {
   rng: Random;
   lootRng: Random;
   nextId = 1;
+  private dropSeq = 0;
   defeatedAt = -99;
   forageAt = new Map<string, number>();
   hintAt = 0;
@@ -282,9 +283,11 @@ export class Adventure {
     }
   }
   giveLoot(spec: { rarity: Rarity; slot?: Slot; unique?: string }) {
-    const m = rollMutation({ seed: Math.floor(this.lootRng.next() * 0xffffffff), ilvl: Math.max(1, this.level), species: this.dino, rarity: spec.rarity, slot: spec.slot, unique: spec.unique, at: Math.floor(this.time) });
+    const seed = (this.save.lootSeed ^ Math.imul(++this.save.lootCounter + 0x51ed, 0x9e3779b1)) >>> 0;
+    const m = rollMutation({ seed, ilvl: Math.max(1, this.level), species: this.dino, rarity: spec.rarity, slot: spec.slot, unique: spec.unique, at: Math.floor(this.time) });
     this.save.stats.mutationsFound++;
-    if (this.save.bag.length >= BAG_LIMIT) this.addDrop({ mutation: m }, { x: this.player.x + 1, y: this.player.y + 1 }, 600);
+    // a reward that does not fit waits on the ground until picked up (it is saved and never expires)
+    if (this.save.bag.length >= BAG_LIMIT) this.addDrop({ mutation: m }, { x: this.player.x + 1, y: this.player.y + 1 }, 1e8);
     else this.save.bag.push({ ...m, fresh: true });
     this.emit("pickup", this.player, { kind: "mutation", rarity: m.rarity, text: m.name, id: m.id });
     return m;
@@ -1382,8 +1385,9 @@ export class Adventure {
   }
   private rollLoot(a: Actor) {
     if (a.summoned || a.npc || a.spec.archetype === "neutral") return;
-    const archetype = a.spec.archetype as LootArchetype;
-    const firstBoss = !!a.rival && !this.save.rivals.includes(a.rival);
+    // a practice rematch pays like an ordinary hunter, so bosses cannot be farmed for guaranteed legendaries
+    const archetype = (a.rematch ? "rusher" : a.spec.archetype) as LootArchetype;
+    const firstBoss = !!a.rival && !this.save.rivals.includes(a.rival) && !a.rematch;
     const drop = rollDrop({
       level: a.level,
       archetype,
@@ -1416,7 +1420,9 @@ export class Adventure {
     }
   }
   addDrop(content: { amber?: number; mutation?: Mutation }, at: Point, seconds = 150) {
-    const d: Drop = { id: `d${this.nextId++}`, x: at.x, y: at.y, ...content, expires: this.time + seconds };
+    let id = `d${Math.floor(this.time * 1000).toString(36)}x${this.dropSeq++}`;
+    while (this.drops.some((x) => x.id === id)) id = `d${Math.floor(this.time * 1000).toString(36)}x${this.dropSeq++}`;
+    const d: Drop = { id, x: at.x, y: at.y, ...content, expires: this.time + seconds };
     this.drops.push(d);
     if (this.drops.length > 40) this.drops.shift();
     return d;
@@ -1591,8 +1597,8 @@ export class Adventure {
     const rival = this.rematchRival;
     if (rival) {
       this.rivalHits.delete(rival.id);
-      this.addActor(rival.species, rival.home, { rival: rival.id });
-      for (const p of rival.companions ?? []) this.addActor(rival.species, p, { rival: rival.id });
+      const again = [this.addActor(rival.species, rival.home, { rival: rival.id }), ...(rival.companions ?? []).map((p) => this.addActor(rival.species, p, { rival: rival.id }))];
+      for (const x of again) if (x) x.rematch = true;
       this.emit("notice", this.player, { text: `${rival.name} rematch · practice mastery, no repeat growth reward` });
       return "rematch";
     }

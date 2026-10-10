@@ -125,6 +125,7 @@ function validRoll(v: unknown): Roll | null {
 export function validateMutation(v: unknown): Mutation | null {
   const m = rec(v);
   if (typeof m.id !== "string" || !m.id || m.id.length > 60) return null;
+  const cleanId = m.id.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 40) || "m" + Math.floor(fin(m.seed, 0, 0xffffffff, 0)).toString(36);
   if (!SLOTS.includes(m.slot as Slot) || !RARITIES.includes(m.rarity as Rarity)) return null;
   const base = typeof m.base === "string" ? baseById(m.base) : undefined;
   if (!base) return null;
@@ -139,7 +140,7 @@ export function validateMutation(v: unknown): Mutation | null {
   }
   const species = (Array.isArray(m.species) ? m.species : []).filter((s): s is Dino => DINOS.includes(s as Dino));
   return {
-    id: m.id,
+    id: cleanId,
     base: base.id,
     name: typeof m.name === "string" ? m.name.slice(0, 60) : base.name,
     slot: m.slot as Slot,
@@ -185,19 +186,29 @@ export function validateCharacter(value: unknown, expectedId?: string): Characte
   c.loadout = [a, b];
   // mutations: worn items must fit the species and slot, otherwise they go back to the bag rather than being lost
   const bag: Mutation[] = [];
-  for (const item of Array.isArray(raw.bag) ? raw.bag.slice(0, 80) : []) {
-    const m = validateMutation(item);
-    if (m && !bag.some((x) => x.id === m.id)) bag.push(m);
-  }
+  const taken = new Set<string>();
+  // two different items must never share an id (a duplicate would be silently dropped): collisions get a fresh suffix
+  const uniq = (m: Mutation) => {
+    let id = m.id;
+    for (let n = 1; taken.has(id); n++) id = m.id.slice(0, 36) + "-" + n;
+    taken.add(id);
+    return id === m.id ? m : { ...m, id };
+  };
   const worn: Character["worn"] = {};
   for (const [slot, item] of Object.entries(rec(raw.worn))) {
     const m = validateMutation(item);
     if (!m) continue;
-    if (m.slot === slot && SLOTS_FOR[species].includes(m.slot) && canWear(m, species) && !worn[m.slot]) worn[m.slot] = m;
-    else if (!bag.some((x) => x.id === m.id)) bag.push(m);
+    if (m.slot === slot && SLOTS_FOR[species].includes(m.slot) && canWear(m, species) && !worn[m.slot]) worn[m.slot] = uniq(m);
+    else bag.push(m);
+  }
+  const spill: Mutation[] = [];
+  for (const item of Array.isArray(raw.bag) ? raw.bag.slice(0, 80) : []) {
+    const m = validateMutation(item);
+    if (m) spill.push(m);
   }
   c.worn = worn;
-  c.bag = bag.filter((m) => !Object.values(worn).some((w) => w?.id === m.id));
+  // misfit worn items first (never lost), then the bag in order
+  c.bag = [...bag, ...spill].map(uniq);
   c.amber = Math.floor(fin(raw.amber, 0, 1e8));
   c.pity = Math.floor(fin(raw.pity, 0, 1000));
   c.lootSeed = Math.floor(fin(raw.lootSeed, 0, 0xffffffff, c.lootSeed));

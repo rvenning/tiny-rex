@@ -68,6 +68,8 @@ export class App {
     window.addEventListener("rex-adventure-pause", () => this.adventurePause());
     window.addEventListener("rex-adventure-nest", () => this.adventureNest());
     window.addEventListener("rex-adventure-dialogue", () => this.dialogue());
+    window.addEventListener("rex-adventure-conflict", () => this.conflictDialog());
+    window.addEventListener("rex-save-failed", () => this.audio.play("nope"));
     window.addEventListener("rex-adventure-menu", ((e: CustomEvent) => {
       const m = e.detail?.menu;
       if (m === "pack") this.mutations();
@@ -296,6 +298,11 @@ export class App {
       }
     });
   }
+  /** another device saved newer progress for this dinosaur while this one was open */
+  private conflictDialog() {
+    if (this.screen !== "adventure") return;
+    this.modal(`<p class="eyebrow">TWO DEVICES, ONE DINOSAUR</p><h2>Newer progress found</h2><p>This dinosaur was played on another device since you opened it. Nothing has been overwritten.</p>${this.button("Load the newer progress", "conflict-newer", undefined, "primary")}${this.button("Keep what I just did here", "conflict-mine", undefined, "quiet")}<p class=\"hint\">Keeping this session replaces the other device's newer progress.</p>`);
+  }
   private help() {
     this.modal(
       `<p class="eyebrow">HOW TO PLAY</p><h2>Hunt. Dodge. Evolve.</h2><div class="help-rules"><p><b>Fight with rhythm.</b> Hold attack for a three-hit combo; the finisher hits hardest but leaves you open. A red shape on the ground shows where a creature will strike; the inner shape shows when.</p><p><b>Dodge the lethal moment.</b> A dodge makes you untouchable for a heartbeat. Dodging <i>into</i> a strike is a Perfect Dodge: your cooldowns refresh and your next hit is critical.</p><p><b>Punish the recovery.</b> A creature that has just attacked is Exposed and takes much more damage.</p><p><b>Eat to grow.</b> Prey you catch fills your Feast: a temporary boost to damage and speed. Level-ups are permanent.</p><p><b>Mutations.</b> Creatures drop biological upgrades (jaws, claws, hide, legs, tail, instincts). Rarer ones change how you fight.</p></div><p>Move WASD / arrows or left thumb · J attack · Space dodge · E and Q skills · I mutations · O skills · M journal · Enter talk or rest · Esc pause.</p><p>Install on iPad: Safari → Share → Add to Home Screen. PINs are convenience locks, not private passwords.</p>${this.install ? this.button("Install Tiny Rex", "install", undefined, "primary") : ""}${this.button(this.reducedMotion ? "Decorative motion off" : "Decorative motion on", "motion", undefined, "quiet")}${this.button("Got it", "close", undefined, "primary")}`,
@@ -324,6 +331,16 @@ export class App {
         break;
       case "adventure-skills":
         this.skills();
+        break;
+      case "conflict-newer":
+        document.querySelector(".modal-backdrop")?.remove();
+        this.chars.invalidate();
+        this.characters();
+        break;
+      case "conflict-mine":
+        scene?.forceSave();
+        document.querySelector(".modal-backdrop")?.remove();
+        scene?.resumeAdventure();
         break;
       case "adventure-quit":
         scene?.persist();
@@ -499,7 +516,7 @@ export class App {
     const a = this.adventureScene().sim;
     const diff = a.save.difficulty;
     this.modal(
-      `<p class="eyebrow">${esc(a.save.name.toUpperCase())} · LV ${a.level} ${DINO_NAMES[a.dino].toUpperCase()}</p><h2>Take a breather.</h2><p>Your adventure is saved.</p>${this.button("Continue exploring →", "adventure-resume", undefined, "primary big")}<div class="row">${this.button(`${ICONS.pack} Mutations`, "adventure-mutations", undefined, "quiet")}${this.button(`${ICONS.tree} Skills${a.skillPoints ? " · " + a.skillPoints : ""}`, "adventure-skills", undefined, "quiet")}${this.button(`${ICONS.book} Journal`, "adventure-journal", undefined, "quiet")}</div><p class="eyebrow">CHALLENGE</p><div class="seg">${DIFFICULTIES.map((x) => `<label><input type="radio" name="d" ${diff === x.id ? "checked" : ""} disabled><span data-action="difficulty" data-value="${x.id}" role="button" tabindex="0"><b>${x.name}</b><small>${x.blurb}</small></span></label>`).join("")}</div><div class="row">${this.button(this.audio.enabled ? "Sound on" : "Sound off", "sound", undefined, "quiet small")}${this.button(this.reducedMotion ? "Motion: calm" : "Motion: full", "motion", undefined, "quiet small")}${this.button("Help", "help", undefined, "quiet small")}</div>${this.button("Save & choose another dinosaur", "adventure-quit", undefined, "quiet")}`,
+      `<p class="eyebrow">${esc(a.save.name.toUpperCase())} · LV ${a.level} ${DINO_NAMES[a.dino].toUpperCase()}</p><h2>Take a breather.</h2>${a.save.name && this.chars.available ? "<p>Your adventure is saved.</p>" : '<p class="warn" role="alert">This device could not save your adventure. Free some storage or leave private browsing, then pause again.</p>'}${this.button("Continue exploring →", "adventure-resume", undefined, "primary big")}<div class="row">${this.button(`${ICONS.pack} Mutations`, "adventure-mutations", undefined, "quiet")}${this.button(`${ICONS.tree} Skills${a.skillPoints ? " · " + a.skillPoints : ""}`, "adventure-skills", undefined, "quiet")}${this.button(`${ICONS.book} Journal`, "adventure-journal", undefined, "quiet")}</div><p class="eyebrow">CHALLENGE</p><div class="seg">${DIFFICULTIES.map((x) => `<label><input type="radio" name="d" ${diff === x.id ? "checked" : ""} disabled><span data-action="difficulty" data-value="${x.id}" role="button" tabindex="0"><b>${x.name}</b><small>${x.blurb}</small></span></label>`).join("")}</div><div class="row">${this.button(this.audio.enabled ? "Sound on" : "Sound off", "sound", undefined, "quiet small")}${this.button(this.reducedMotion ? "Motion: calm" : "Motion: full", "motion", undefined, "quiet small")}${this.button("Help", "help", undefined, "quiet small")}</div>${this.button("Save & choose another dinosaur", "adventure-quit", undefined, "quiet")}`,
     );
     // the difficulty chips are spans so a keyboard press must work too
     document.querySelectorAll<HTMLElement>('.seg span[data-action="difficulty"]').forEach((el) => {
@@ -556,11 +573,11 @@ export class App {
         .map((s) => {
           const m = sim.save.worn[s];
           return m
-            ? `<button class="slot r-${m.rarity} ${this.view.sel === m.id ? "sel" : ""}" data-action="pick" data-value="${m.id}"><span class="gl">${slotIcon(s)}</span><b>${esc(m.name)}</b><small>${SLOT_NAMES[s]} · ${RARITY_NAMES[m.rarity]}</small></button>`
+            ? `<button class="slot r-${m.rarity} ${this.view.sel === m.id ? "sel" : ""}" data-action="pick" data-value="${esc(m.id)}"><span class="gl">${slotIcon(s)}</span><b>${esc(m.name)}</b><small>${SLOT_NAMES[s]} · ${RARITY_NAMES[m.rarity]}</small></button>`
             : `<div class="slot empty"><span class="gl">${slotIcon(s)}</span><b>${SLOT_NAMES[s]}</b><small>Empty</small></div>`;
         })
         .join("")}</div><div class="bag-tools"><b>Bag <span class="count">${sim.save.bag.length}/${BAG_LIMIT}</span></b><label class="sr-only" for="sort">Sort</label><select id="sort" onchange="this.dispatchEvent(new CustomEvent('rex-sort',{bubbles:true,detail:this.value}))">${(["rarity", "slot", "level", "recent", "score"] as SortKey[]).map((k) => `<option value="${k}" ${this.view.sort === k ? "selected" : ""}>Sort: ${{ rarity: "rarity", slot: "slot", level: "item level", recent: "newest", score: "power" }[k]}</option>`).join("")}</select><label class="sr-only" for="flt">Filter</label><select id="flt">${["all", ...slots].map((s) => `<option value="${s}" ${this.view.filter === s ? "selected" : ""}>${s === "all" ? "All slots" : SLOT_NAMES[s as Slot]}</option>`).join("")}</select></div><div class="bag">${bag
-        .map((m) => `<button class="item r-${m.rarity} ${m.rarity === "legendary" ? "legendary" : ""} ${m.fresh ? "fresh" : ""} ${this.view.sel === m.id ? "sel" : ""}" data-action="pick" data-value="${m.id}" aria-label="${esc(m.name)}, ${RARITY_NAMES[m.rarity]} ${SLOT_NAMES[m.slot]}"><span class="gl">${slotIcon(m.slot)}</span><span class="lv">${m.ilvl}</span></button>`)
+        .map((m) => `<button class="item r-${m.rarity} ${m.rarity === "legendary" ? "legendary" : ""} ${m.fresh ? "fresh" : ""} ${this.view.sel === m.id ? "sel" : ""}" data-action="pick" data-value="${esc(m.id)}" aria-label="${esc(m.name)}, ${RARITY_NAMES[m.rarity]} ${SLOT_NAMES[m.slot]}"><span class="gl">${slotIcon(m.slot)}</span><span class="lv">${m.ilvl}</span></button>`)
         .join("") || '<p class="hint" style="grid-column:1/-1">Nothing here yet. Creatures drop mutations as you hunt.</p>'}</div></div><div>${this.mutDetail(sel, sim, wornSel ? "worn" : "bag")}<h3 style="margin-top:16px">Character sheet</h3><div class="sheet">${sheetRows}</div></div></div>${this.button("Back", "adventure-pause", undefined, "quiet")}${this.button("Continue exploring →", "adventure-resume", undefined, "primary")}`,
       "wide",
     );
@@ -663,7 +680,8 @@ export class App {
       if (e.key === "Escape") {
         e.preventDefault();
         e.stopPropagation();
-        if (s.choices) {
+        // only idle chatter may be dismissed with Escape: offers, hand-ins and choices must be accepted on purpose
+        if (s.kind !== "chatter") {
           sim.cancelDialogue();
           this.action("adventure-resume");
         } else this.endDialogue();

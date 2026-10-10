@@ -113,25 +113,32 @@ export class CharacterStore {
         book.active = Object.values(book.characters).find((c) => c.species === legacy.snapshot.dino)?.id ?? first?.id ?? null;
         if (Object.keys(book.characters).length) this.recovered = existed ? "legacy" : null;
       }
-      if (Object.keys(book.characters).length) this.persist(pid, book);
-    } else if (this.recovered) this.persist(pid, book);
+      if (Object.keys(book.characters).length) this.persist(pid, book, false);
+    } else if (this.recovered) this.persist(pid, book, false);
     this.cache.set(pid, book);
     return book;
   }
-  private persist(pid: string, book: CharacterBook) {
+  /** Write the primary first (so a full disk fails before anything is rotated), then rotate the previous copy into the
+   *  backup and known-good slots. A previous copy that does not parse never replaces a good backup. */
+  private persist(pid: string, book: CharacterBook, rotate = true) {
     if (!this.storage) return;
+    let prev: string | null = null;
     try {
-      const prev = this.storage.getItem(this.key(pid));
-      const text = JSON.stringify(book);
-      if (prev) {
-        // keep the previous write as a backup, and promote it to the "good" copy only when it still validates
-        this.storage.setItem(this.key(pid, "_backup"), prev);
-        const old = this.parse(pid, "_backup");
-        if (old && weight(old) >= weight(this.parse(pid, "_good") ?? emptyBook())) this.storage.setItem(this.key(pid, "_good"), prev);
-      }
-      this.storage.setItem(this.key(pid), text);
+      prev = this.storage.getItem(this.key(pid));
+      this.storage.setItem(this.key(pid), JSON.stringify(book));
+      this.available = true;
     } catch {
       this.available = false;
+      return;
+    }
+    if (!prev || !rotate) return;
+    try {
+      const old = validateBook(JSON.parse(prev));
+      if (!old) return;
+      this.storage.setItem(this.key(pid, "_backup"), prev);
+      if (weight(old) >= weight(this.parse(pid, "_good") ?? emptyBook())) this.storage.setItem(this.key(pid, "_good"), prev);
+    } catch {
+      /* rotation is best-effort; the primary is already safe */
     }
   }
   /** replace the in-memory book (e.g. after a sync merge) and persist it */
@@ -160,11 +167,18 @@ export class CharacterStore {
     this.persist(pid, book);
     return c;
   }
-  /** write a character; bumps its rev so a sync merge prefers it */
-  save(pid: string, c: Character, now = Date.now()): Character {
+  /** True when the stored copy is newer than the one a running session holds (another device synced progress in). */
+  isStale(pid: string, c: Character) {
+    const prev = this.read(pid).characters[c.id];
+    return !!prev && prev.rev > c.rev;
+  }
+  /** write a character; bumps its rev so a sync merge prefers it. Returns null (and writes nothing) when the stored copy is
+   *  newer than this session's, unless `force` is set: a stale autosave must never silently overwrite newer progress. */
+  save(pid: string, c: Character, now = Date.now(), force = false): Character | null {
     const book = this.read(pid);
     const prev = book.characters[c.id];
     if (!prev && book.trash.some((t) => t.character.id === c.id)) return c; // deleted: never resurrect from a stale autosave
+    if (prev && prev.rev > c.rev && !force) return null;
     c.rev = Math.max(c.rev, prev?.rev ?? 0) + 1;
     c.updated = now;
     book.characters[c.id] = c;

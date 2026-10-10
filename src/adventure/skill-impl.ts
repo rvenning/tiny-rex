@@ -98,10 +98,16 @@ export function beginSkill(sim: Adventure, p: Player, id: string) {
         const back = t.face + Math.PI;
         let q = { x: t.x + Math.cos(back) * (t.spec.r + sim.radius + 0.5), y: t.y + Math.sin(back) * (t.spec.r + sim.radius + 0.5) };
         if (!sim.world.grid.fits(q.x, q.y, sim.radius)) q = sim.world.grid.nearestWalkable(q.x, q.y, sim.radius);
-        p.x = q.x;
-        p.y = q.y;
-        p.face = heading(p, t);
-        p.nextCrit = true;
+        // never through a wall, across water or past a locked gate: if the landing is not a legal walk away, dash instead
+        if (sim.world.grid.clearLine(p.x, p.y, q.x, q.y) && sim.canTravel(p, q)) {
+          p.x = q.x;
+          p.y = q.y;
+          p.face = heading(p, t);
+          p.nextCrit = true;
+        } else {
+          p.dashX = (Math.cos(p.face) * 4.5) / 0.3;
+          p.dashY = (Math.sin(p.face) * 4.5) / 0.3;
+        }
       } else {
         p.dashX = (Math.cos(p.face) * 4.5) / 0.3;
         p.dashY = (Math.sin(p.face) * 4.5) / 0.3;

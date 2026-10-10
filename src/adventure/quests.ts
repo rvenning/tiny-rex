@@ -355,6 +355,8 @@ export class QuestEngine {
       else for (const s of step.spawn) this.host.spawnTagged(id, s);
     }
     if (step.type === "escort") this.host.escortStart(id, step.from, step.count);
+    // a reload mid-defence: the wave's creatures are not saved, so they are called again rather than counted as beaten
+    if (resume && step.type === "protect" && typeof st.data.wave === "number" && st.data.wave >= 0 && this.host.countTagged(id, true) === 0) this.startWave(id, step, Math.min(st.data.wave, step.waves.length - 1));
     this.checkInstant(id);
   }
   private respawnStepCreatures(id: string, step: KillStep | EscortStep) {

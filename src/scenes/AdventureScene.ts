@@ -1401,11 +1401,39 @@ export class AdventureScene extends Phaser.Scene {
     return c;
   }
   // ---------------------------------------------------------------- lifecycle
+  private conflictPending = false;
+  private warnedStorage = false;
   persist() {
-    if (!this.sim) return;
+    if (!this.sim || this.conflictPending) return;
     const saved = this.store.save(this.profileId, this.sim.checkpoint());
+    if (!saved) {
+      // another device saved newer progress for this dinosaur: never overwrite it silently, ask the player
+      this.conflictPending = true;
+      this.input.keyboard?.resetKeys();
+      this.game.scene.pause("Adventure");
+      window.dispatchEvent(new Event("rex-adventure-conflict"));
+      return;
+    }
+    this.sim.save.rev = saved.rev;
+    if (!this.store.available && !this.warnedStorage) {
+      this.warnedStorage = true;
+      this.hud.toast("This device cannot save right now (storage full or blocked). Free some space or leave private browsing", "bad");
+      window.dispatchEvent(new Event("rex-save-failed"));
+    }
     this.lastSave = this.sim.time;
     window.dispatchEvent(new CustomEvent("rex-adventure-save", { detail: { id: this.profileId, book: this.store.read(this.profileId), character: saved.id } }));
+  }
+  /** the player chose to keep this session's progress over the newer copy */
+  forceSave() {
+    const saved = this.store.save(this.profileId, this.sim.checkpoint(), Date.now(), true);
+    if (saved) this.sim.save.rev = saved.rev;
+    this.conflictPending = false;
+  }
+  get saveBlocked() {
+    return this.conflictPending;
+  }
+  get storageOk() {
+    return this.store.available;
   }
   requestPause() {
     if (this.scene.isPaused() || !this.ready) return;
