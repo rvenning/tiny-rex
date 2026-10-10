@@ -696,6 +696,26 @@ export class QuestEngine {
     if (step.type === "collect") text += ` · ${st.progress}/${step.items.length}`;
     return { text, target: this.targetOf(id), quest: q.title };
   }
+  /** world markers for the current step of every active quest: clues, items, plates, destinations (drawn by the scene) */
+  visuals(): { kind: "clue" | "item" | "plate" | "goal"; x: number; y: number; on?: boolean; quest: string }[] {
+    const out: { kind: "clue" | "item" | "plate" | "goal"; x: number; y: number; on?: boolean; quest: string }[] = [];
+    for (const id of this.activeIds()) {
+      const q = this.def(id)!,
+        st = this.state(id)!,
+        step = q.steps[st.step];
+      if (!step) continue;
+      if (step.type === "track") {
+        const c = step.clues[Math.min(st.progress, step.clues.length - 1)];
+        if (c) out.push({ kind: "clue", x: c.x, y: c.y, quest: id });
+      } else if (step.type === "collect") {
+        const got = (st.data.got as string | undefined)?.split(",") ?? [];
+        step.items.forEach((p, i) => !got.includes(String(i)) && out.push({ kind: "item", x: p.x, y: p.y, quest: id }));
+      } else if (step.type === "plates") {
+        step.plates.forEach((p, i) => out.push({ kind: "plate", x: p.x, y: p.y, on: st.data.on === i, quest: id }));
+      } else if (step.type === "goto" || step.type === "protect") out.push({ kind: "goal", x: step.at.x, y: step.at.y, quest: id });
+    }
+    return out;
+  }
   journal(): JournalEntry[] {
     const out: JournalEntry[] = [];
     for (const q of this.defs) {

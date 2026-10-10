@@ -707,8 +707,11 @@ export class Adventure {
   get rematchRival() {
     return RIVALS.find((r) => this.save.rivals.includes(r.id) && dist(this.player, r.home) < 5 && !this.actors.some((a) => a.rival === r.id && a.state !== "dead"));
   }
+  /** the creature to talk to: someone with business for you wins over the nearest bystander */
   get nearNpc() {
-    return this.actors.find((a) => a.npc && a.state !== "dead" && dist(a, this.player) < a.spec.r + this.radius + 1.6);
+    const near = this.actors.filter((a) => a.npc && a.state !== "dead" && !a.follow && dist(a, this.player) < a.spec.r + this.radius + 1.6);
+    near.sort((x, y) => Number(!!this.quests.marker(y.npc!)) - Number(!!this.quests.marker(x.npc!)) || dist(x, this.player) - dist(y, this.player));
+    return near[0];
   }
   get interactLabel() {
     const n = this.nearNpc;

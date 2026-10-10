@@ -237,7 +237,7 @@ export const CREATURES: CreatureSpec[] = [
     },
   },
   {
-    id: "glimmerjaw", name: "The Glimmerjaw", sprite: "gigano", role: "sweeper", archetype: "boss", level: 27, r: 1.9, speed: 4.8, hp: 820, power: 4, reward: 140, sense: 16, scale: 1.18, tint: 0xffd98a,
+    id: "glimmerjaw", name: "The Glimmerjaw", sprite: "gigano", role: "sweeper", archetype: "boss", level: 27, r: 1.9, speed: 4.8, hp: 820, power: 4, reward: 140, sense: 10, scale: 1.18, tint: 0xffd98a,
     fact: "What the Heartstone made of an ordinary hunter: bigger, brighter and never full.",
     attacks: [
       L({ id: "sweep", kind: "sweep", name: "Amber sweep", windup: 0.95, strike: 0.5, recover: 1.4, reach: 6.2, arc: 1.7, damage: 1.6, cd: 1.5, weight: 3, knock: 2.5 }),

@@ -15,6 +15,7 @@ import { Fx, makeTextures } from "./adventure/fx";
 import { Ambient } from "./adventure/ambient";
 import { findRoute } from "../adventure/guide";
 import { GroundLayer, PropLayer } from "./adventure/world-view";
+import { WorldDecor } from "./adventure/decor";
 
 const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
 const MAP_COLORS: Record<string, string> = {
@@ -61,6 +62,10 @@ export class AdventureScene extends Phaser.Scene {
   private props!: PropLayer;
   private fx!: Fx;
   private ambient?: Ambient;
+  private decor?: WorldDecor;
+  private questMarks = new Map<string, Phaser.GameObjects.Image>();
+  private visTimer = 0;
+  private visuals: ReturnType<Adventure["quests"]["visuals"]> = [];
   private route: Point[] = [];
   private routeTimer = 0;
   private guideArrow?: Phaser.GameObjects.Image;
@@ -180,6 +185,8 @@ export class AdventureScene extends Phaser.Scene {
     this.ground = new GroundLayer(this, this.world);
     this.props = new PropLayer(this, this.world);
     this.ambient = new Ambient(this, this.fx, this.world.grid, this.reduced, this.world.meta.features as never);
+    this.decor = new WorldDecor(this, this.props, this.world);
+    this.decor.refresh(new Set(this.sim.save.flags));
     for (const d of DISCOVERIES) {
       const m = this.add.image(0, 0, "icon-find").setScale(0.5).setVisible(false);
       this.markers.set(d.id, m);
@@ -311,6 +318,10 @@ export class AdventureScene extends Phaser.Scene {
     this.props?.destroy();
     this.ambient?.destroy();
     this.ambient = undefined;
+    this.decor?.destroy();
+    this.decor = undefined;
+    for (const m of this.questMarks.values()) m.destroy();
+    this.questMarks.clear();
     this.fx?.destroy();
     for (const v of this.views.values()) v.destroy();
     this.views.clear();
@@ -617,6 +628,8 @@ export class AdventureScene extends Phaser.Scene {
         m.setPosition(q.x, q.y).setDepth(q.y + 4).setAlpha(Math.min(1, (14 - dist(d, p)) / 4));
       }
     }
+    this.decor?.update(sim.time, this.cameras.main.worldView, this.reduced);
+    this.drawQuestMarks(dt);
     // hazards (steam vents warn before they burst)
     for (const h of sim.hazards) {
       if (dist(h, p) > 30 || (h.offFlag && sim.hasFlag(h.offFlag))) continue;
@@ -644,6 +657,54 @@ export class AdventureScene extends Phaser.Scene {
     const hunt = sim.actors.filter((a) => a.state === "windup" || a.state === "strike").map((a) => proj(a.x, a.y, 0));
     this.props.fade(proj(p.x, p.y, pz), hunt, dt);
     this.drawFootsteps(dt);
+  }
+  /** clues, herbs, stepping plates and destinations of the active quests */
+  private drawQuestMarks(dt: number) {
+    const sim = this.sim,
+      g = this.world.grid;
+    this.visTimer -= dt;
+    if (this.visTimer <= 0) {
+      this.visTimer = 0.3;
+      this.visuals = sim.quests.visuals();
+    }
+    const live = new Set<string>();
+    for (const v of this.visuals) {
+      if (dist(v, sim.player) > 30) continue;
+      const key = v.quest + ":" + v.kind + ":" + v.x + "," + v.y;
+      live.add(key);
+      const z = g.height(v.x, v.y);
+      if (v.kind === "plate" || v.kind === "goal") {
+        this.cues.lineStyle(v.kind === "plate" ? 3 : 2, v.on ? 0xfff0a0 : 0x8fd2ff, v.kind === "plate" ? 0.9 : 0.6);
+        this.ellipseOnGround(this.cues, v.x, v.y, v.kind === "plate" ? 0.9 : 1.6, z);
+        if (v.on) {
+          this.cues.fillStyle(0xfff0a0, 0.35);
+          this.fillEllipseOnGround(this.cues, v.x, v.y, 0.9, z);
+        } else if (v.kind === "plate") {
+          this.cues.fillStyle(0x8fd2ff, 0.18);
+          this.fillEllipseOnGround(this.cues, v.x, v.y, 0.9, z);
+        }
+        continue;
+      }
+      let m = this.questMarks.get(key);
+      if (!m) {
+        m = this.add.image(0, 0, "icon-find").setScale(0.4);
+        m.setTint(v.kind === "clue" ? 0xff8a6a : 0x9be05c);
+        this.questMarks.set(key, m);
+      }
+      const q = proj(v.x, v.y, z + 0.5 + Math.sin(sim.time * 3 + v.x) * 0.1);
+      m.setPosition(q.x, q.y).setDepth(q.y + 6).setAlpha(Math.min(1, (30 - dist(v, sim.player)) / 6));
+    }
+    for (const [k, m] of this.questMarks)
+      if (!live.has(k)) {
+        m.destroy();
+        this.questMarks.delete(k);
+      }
+  }
+  /** one-time, just-in-time hints: nothing is explained before the moment it matters */
+  private hint(id: string, text: string) {
+    if (this.sim.hasFlag("hint:" + id)) return;
+    this.sim.save.flags.push("hint:" + id);
+    this.hud.toast(text, "hint");
   }
   private drawDrops(dt: number) {
     const sim = this.sim,
@@ -1028,6 +1089,7 @@ export class AdventureScene extends Phaser.Scene {
         burst("fx-soft", calm ? 2 : 6, 70, { life: 0.35, tint: e.kind === "spit" ? 0x9be05c : e.kind === "amber" ? 0xffc34d : 0xc8a070, a: 0.7 });
         break;
       case "tell": {
+        this.hint("dodge", "Dodge out of the red shape with Space. Dodge INTO the strike for a Perfect Dodge");
         audio.play("tell");
         const a = sim.actors.find((x) => x.id === e.actor);
         if (a) {
@@ -1072,6 +1134,7 @@ export class AdventureScene extends Phaser.Scene {
         this.persist();
         break;
       case "levelup": {
+        if ((e.amount ?? 0) >= 5) this.hint("slotb", "Second skill unlocked · choose it in Skills (O)");
         audio.play("levelup");
         this.zoomPulse = 1;
         const pts = sim.skillPoints;
@@ -1118,6 +1181,7 @@ export class AdventureScene extends Phaser.Scene {
           this.dmgNumber(`+${e.amount} amber`, q.x, q.y - 40, "#ffcf75", 20, 0.9, -40);
         } else {
           const r = (e.rarity ?? "common") as Rarity;
+          this.hint("mutation", "A mutation! Press I (or the pack button) to wear it");
           audio.play("loot-" + r);
           this.hud.toast(`${e.text}`, r === "common" ? "reward" : "loot-" + r);
           burst("fx-spark", calm ? 4 : r === "legendary" ? 22 : 10, 120, { life: 0.8, tint: RARITY_TINT[r], blend: Phaser.BlendModes.ADD });
@@ -1144,7 +1208,10 @@ export class AdventureScene extends Phaser.Scene {
         this.persist();
         break;
       case "world":
-        if (e.id && !e.kind) this.persist();
+        if (e.id && !e.kind) {
+          this.decor?.refresh(new Set(sim.save.flags));
+          this.persist();
+        }
         break;
       case "hazard":
         if (e.text) this.hud.toast(e.text, "bad");
