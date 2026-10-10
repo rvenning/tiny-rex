@@ -1,5 +1,7 @@
 /** Typed content tables for the connected world. Positions are world units (see world/projection.ts). */
 import { CONNECTED } from './connected-content';
+import { EXTRA_RIVALS, EXTRA_SPAWNS } from "./content";
+import { CREATURES } from "./bestiary";
 export type Dino = "rex" | "raptor" | "trike";
 export type RegionId =
   "hollow" | "river" | "marsh" | "dunes" | "ember" | "caves";
@@ -127,7 +129,7 @@ export const DINOS: Record<Dino, DinoSpec> = {
         speed: 4.6,
         reach: 1.3,
         damage: 11,
-        dodgeDist: 2.6,
+        dodgeDist: 3.6,
         sprite: 0.75,
       },
       {
@@ -135,16 +137,16 @@ export const DINOS: Record<Dino, DinoSpec> = {
         speed: 4.5,
         reach: 1.6,
         damage: 20,
-        dodgeDist: 2.8,
+        dodgeDist: 3.8,
         sprite: 0.88,
       },
-      { r: 1.0, speed: 4.4, reach: 1.9, damage: 34, dodgeDist: 3.0, sprite: 1 },
+      { r: 1.0, speed: 4.4, reach: 1.9, damage: 34, dodgeDist: 4.0, sprite: 1 },
       {
         r: 1.25,
         speed: 4.3,
         reach: 2.2,
         damage: 52,
-        dodgeDist: 3.2,
+        dodgeDist: 4.2,
         sprite: 1.12,
       },
     ],
@@ -160,212 +162,9 @@ export const DINOS: Record<Dino, DinoSpec> = {
 };
 export const MAX_HP = 3;
 
-export type Role = "prey" | "lunger" | "sweeper" | "charger" | "armour";
-export interface CreatureSpec {
-  id: string;
-  name: string;
-  sprite: string; // creature atlas id
-  role: Role;
-  r: number;
-  speed: number;
-  hp: number;
-  power: number; // comparable size/threat tier 0..4
-  reward: number; // growth points
-  sense: number; // distance at which it notices a moving player
-  scale: number; // sprite scale
-  fact: string;
-  // predator tuning
-  windup?: number;
-  strike?: number;
-  recover?: number;
-  reach?: number; // attack length
-  arc?: number; // half angle
-  lungeSpeed?: number;
-  damage?: number; // hearts
-  cooldown?: number;
-}
-export const CREATURES: CreatureSpec[] = [
-  {
-    id: "beetle",
-    name: "Giant beetle",
-    sprite: "beetle",
-    role: "prey",
-    r: 0.3,
-    speed: 1.6,
-    hp: 1,
-    power: 0,
-    reward: 1,
-    sense: 4.5,
-    scale: 1,
-    fact: "It feeds, then freezes. Move slowly and it may not notice you.",
-  },
-  {
-    id: "dragonfly",
-    name: "Meganeura",
-    sprite: "dragonfly",
-    role: "prey",
-    r: 0.3,
-    speed: 4.2,
-    hp: 1,
-    power: 0,
-    reward: 2,
-    sense: 5.5,
-    scale: 1,
-    fact: "A giant dragonfly. Wait for it to settle on a reed.",
-  },
-  {
-    id: "compy",
-    name: "Compsognathus",
-    sprite: "compy",
-    role: "prey",
-    r: 0.4,
-    speed: 5.4,
-    hp: 6,
-    power: 0,
-    reward: 3,
-    sense: 8,
-    scale: 1,
-    fact: "Small, quick and always in a group.",
-  },
-  {
-    id: "hypsi",
-    name: "Hypsilophodon",
-    sprite: "hypsilophodon",
-    role: "prey",
-    r: 0.55,
-    speed: 5.1,
-    hp: 16,
-    power: 1,
-    reward: 5,
-    sense: 9,
-    scale: 1,
-    fact: "A nimble grazer. It bolts when you break into a run.",
-  },
-  {
-    id: "raptor",
-    name: "Velociraptor",
-    sprite: "raptor",
-    role: "lunger",
-    r: 0.7,
-    speed: 5.8,
-    hp: 60,
-    power: 2,
-    reward: 14,
-    sense: 11,
-    scale: 1,
-    fact: "Feathered, turkey-sized in life, with a hooked claw on each foot.",
-    windup: 0.85,
-    strike: 0.36,
-    recover: 1.25,
-    reach: 4.8,
-    arc: 0.3,
-    lungeSpeed: 12,
-    damage: 1,
-    cooldown: 1.4,
-  },
-  {
-    id: "oviraptor",
-    name: "Oviraptor",
-    sprite: "oviraptor",
-    role: "lunger",
-    r: 0.65,
-    speed: 5.0,
-    hp: 36,
-    power: 1,
-    reward: 8,
-    sense: 9,
-    scale: 1,
-    fact: "Its name came from a mistaken reading of a nest.",
-    windup: 0.8,
-    strike: 0.34,
-    recover: 1.1,
-    reach: 4.0,
-    arc: 0.3,
-    lungeSpeed: 11,
-    damage: 0.8,
-    cooldown: 1.6,
-  },
-  {
-    id: "dilo",
-    name: "Dilophosaurus",
-    sprite: "dilophosaurus",
-    role: "lunger",
-    r: 0.85,
-    speed: 4.8,
-    hp: 90,
-    power: 3,
-    reward: 22,
-    sense: 11,
-    scale: 1,
-    fact: "The real animal had two thin head crests and no neck frill.",
-    windup: 0.9,
-    strike: 0.4,
-    recover: 1.3,
-    reach: 5.2,
-    arc: 0.3,
-    lungeSpeed: 12,
-    damage: 1.2,
-    cooldown: 1.3,
-  },
-  {
-    id: "gigano",
-    name: "Basalt Matriarch",
-    sprite: "gigano",
-    role: "sweeper",
-    r: 1.7,
-    speed: 4.4,
-    hp: 260,
-    power: 4,
-    reward: 90,
-    sense: 15,
-    scale: 1,
-    fact: "A giant of the south, with a long skull and heavy tail.",
-    windup: 1.0,
-    strike: 0.5,
-    recover: 1.5,
-    reach: 5.8,
-    arc: 1.7,
-    damage: 1.5,
-    cooldown: 1.6,
-  },
-  {
-    id: "trike",
-    name: "Triceratops",
-    sprite: "trike",
-    role: "armour",
-    r: 1.1,
-    speed: 3.2,
-    hp: 100,
-    power: 3,
-    reward: 0,
-    sense: 7,
-    scale: 1,
-    fact: "A three-horned plant-eater. Leave it in peace, or leave room for its charge.",
-    windup: 1.0,
-    strike: 0.7,
-    recover: 1.6,
-    reach: 8,
-    arc: 0.22,
-    lungeSpeed: 13,
-    damage: 1.2,
-    cooldown: 3,
-  },
-  {
-    id: "kentro",
-    name: "Kentrosaurus",
-    sprite: "kentro",
-    role: "armour",
-    r: 0.95,
-    speed: 2.8,
-    hp: 80,
-    power: 2,
-    reward: 0,
-    sense: 6,
-    scale: 1,
-    fact: "Its spikes make it a neighbour to leave in peace.",
-  },
-];
-export const creature = (id: string) => CREATURES.find((c) => c.id === id)!;
+export { CREATURES, creature, attacksOf } from "./bestiary";
+export type { CreatureSpec, Role, Archetype, AttackDef, AttackKind, BossDef, BossPhase } from "./bestiary";
+
 
 export interface Region {
   id: RegionId;
@@ -483,7 +282,14 @@ export interface Rival {
   companions?: Point[];
   pattern?: string;
 }
-export const RIVALS: Rival[] = CONNECTED.rivals.map(r => ({...r, home: {...r.home}, companions: 'companions' in r ? r.companions.map(p => ({...p})) : []}));
+/** boss creature spec used for each milestone encounter (the generated content only names a placeholder species) */
+const RIVAL_SPECIES: Record<string, string> = { "river-hunter": "river-hunter", "marsh-pack": "reed-stalker", "basalt-matriarch": "gigano" };
+export const RIVALS: Rival[] = [
+  ...CONNECTED.rivals.map(r => ({...r, species: RIVAL_SPECIES[r.id] ?? r.species, home: {...r.home}, companions: 'companions' in r ? r.companions.map(p => ({...p})) : []})),
+  // the Hollow's miniboss holds the old perch (formerly an unnamed sentinel raptor)
+  { id: "old-scar", name: "Old Scar", species: "old-scar", region: "hollow" as RegionId, home: { x: 40.5, y: 31 }, companions: [] },
+  ...EXTRA_RIVALS.map((r) => ({ ...r, home: { ...r.home }, companions: (r.companions ?? []).map((p) => ({ ...p })) })),
+];
 
 /** Initial population per region: [creature, x, y]. Hollow's raptor guards its perch. */
 export const SPAWNS: Record<RegionId, [string, number, number][]> = {
@@ -507,8 +313,13 @@ export const SPAWNS: Record<RegionId, [string, number, number][]> = {
   ember: [],
   caves: [],
 };
-export const SENTINELS = new Set(["raptor@40.5,31"]);
+export const SENTINELS = new Set(["old-scar@40.5,31"]);
 for (const id of ['river','marsh','dunes','ember','caves'] as RegionId[]) SPAWNS[id] = CONNECTED.spawns[id as keyof typeof CONNECTED.spawns].map(s => [...s] as [string,number,number]);
+/** content files add encounters on top of the generated population */
+for (const [id, x, y, level] of EXTRA_SPAWNS) {
+  const region = REGIONS.find((r) => x >= r.bounds[0] && x < r.bounds[2] && y >= r.bounds[1] && y < r.bounds[3])?.id ?? "hollow";
+  (SPAWNS[region] as [string, number, number, number?][]).push(level ? [id, x, y, level] : [id, x, y]);
+}
 export interface Gate extends Point { id:string; name:string; kind:string; requiredStage:number; width:number; normal:readonly number[]; fromRegion?:RegionId; toRegion?:RegionId; species?:Dino; optional?:boolean; prop?:string; action?:string; blurb?:string; }
 export interface Portal extends Point { id:string; name:string; to:Point; requiredStage:number; species?:Dino; bidirectional:boolean; optional:boolean; }
 export interface MasteryObjective { id:string; region:RegionId; name:string; kind:string; target?:string; count?:number; seconds?:number; reward:number; destination?:string; from?:Point; to?:Point; }

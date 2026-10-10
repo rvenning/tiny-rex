@@ -5,7 +5,7 @@ test("action pointer cancellation releases a held bite and Escape pauses", async
 }) => {
   await isolate(page);
   await start(page);
-  const bite = page.getByRole("button", { name: "Bite", exact: true });
+  const bite = page.getByRole("button", { name: "Attack", exact: true });
   // Use the real pointer lifecycle; cancellation must clear the held state.
   const box = (await bite.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
@@ -87,11 +87,11 @@ test("touch movement retains its finger while actions and a second finger are us
     })
     .toBeGreaterThan(0.25);
   // Action controls keep working while the movement finger remains down.
-  const bite = page.getByRole("button", { name: "Bite", exact: true });
+  const bite = page.getByRole("button", { name: "Attack", exact: true });
   const box = (await bite.boundingBox())!;
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
   await page.mouse.down();
-  await expect(bite).toHaveClass(/cooling/);
+  await expect(bite).toHaveClass(/down/);
   await page.mouse.up();
   const second = { id: 8, x: 800, y: 520 },
     secondMoved = { id: 8, x: 700, y: 520 };

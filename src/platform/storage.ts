@@ -127,6 +127,7 @@ export class SaveStore {
       localStorage.removeItem("trex_progress_" + id);
       localStorage.removeItem("trex_adventure_v1_" + id);
       localStorage.removeItem("trex_adventure_v1_" + id + "_backup");
+      for (const s of ["", "_backup", "_good", "_corrupt"]) localStorage.removeItem("trex_chars_v2_" + id + s);
     } catch {}
     const s = this.settings;
     if (s.lastProfile === id)

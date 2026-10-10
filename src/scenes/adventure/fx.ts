@@ -127,6 +127,86 @@ export function makeTextures(scene: Phaser.Scene) {
     c.fill();
     c.stroke();
   });
+  // loot gem, light beam, projectile glob, slash crescent, quest marks
+  make("fx-gem", 48, 48, (c) => {
+    c.translate(24, 24);
+    c.fillStyle = "#ffffff";
+    c.strokeStyle = "rgba(0,0,0,0.55)";
+    c.lineWidth = 2.5;
+    c.lineJoin = "round";
+    c.beginPath();
+    c.moveTo(0, -19);
+    c.lineTo(15, -4);
+    c.lineTo(0, 19);
+    c.lineTo(-15, -4);
+    c.closePath();
+    c.fill();
+    c.stroke();
+    c.strokeStyle = "rgba(0,0,0,0.3)";
+    c.beginPath();
+    c.moveTo(-15, -4);
+    c.lineTo(15, -4);
+    c.moveTo(0, -19);
+    c.lineTo(-6, -4);
+    c.lineTo(0, 19);
+    c.moveTo(0, -19);
+    c.lineTo(6, -4);
+    c.lineTo(0, 19);
+    c.stroke();
+  });
+  make("fx-beam", 32, 256, (c) => {
+    const g = c.createLinearGradient(0, 0, 0, 256);
+    g.addColorStop(0, "rgba(255,255,255,0)");
+    g.addColorStop(0.55, "rgba(255,255,255,0.55)");
+    g.addColorStop(1, "rgba(255,255,255,0.95)");
+    c.fillStyle = g;
+    c.beginPath();
+    c.moveTo(14, 0);
+    c.lineTo(18, 0);
+    c.lineTo(30, 256);
+    c.lineTo(2, 256);
+    c.closePath();
+    c.fill();
+  });
+  make("fx-glob", 40, 40, (c) => {
+    const g = c.createRadialGradient(20, 20, 1, 20, 20, 19);
+    g.addColorStop(0, "rgba(255,255,255,1)");
+    g.addColorStop(0.45, "rgba(255,255,255,0.85)");
+    g.addColorStop(1, "rgba(255,255,255,0)");
+    c.fillStyle = g;
+    c.fillRect(0, 0, 40, 40);
+  });
+  make("fx-slash", 128, 64, (c) => {
+    c.strokeStyle = "rgba(255,255,255,0.95)";
+    c.lineCap = "round";
+    c.lineWidth = 9;
+    c.beginPath();
+    c.arc(64, 70, 54, Math.PI * 1.12, Math.PI * 1.88);
+    c.stroke();
+    c.lineWidth = 4;
+    c.globalAlpha = 0.55;
+    c.beginPath();
+    c.arc(64, 70, 44, Math.PI * 1.16, Math.PI * 1.84);
+    c.stroke();
+  });
+  make("icon-quest", 48, 64, (c) => {
+    c.fillStyle = "#ffd36a";
+    c.strokeStyle = "#3a2a08";
+    c.lineWidth = 4;
+    c.font = "bold 56px Georgia, serif";
+    c.textAlign = "center";
+    c.strokeText("!", 24, 52);
+    c.fillText("!", 24, 52);
+  });
+  make("icon-turnin", 48, 64, (c) => {
+    c.fillStyle = "#8fe39b";
+    c.strokeStyle = "#0e2a18";
+    c.lineWidth = 4;
+    c.font = "bold 56px Georgia, serif";
+    c.textAlign = "center";
+    c.strokeText("?", 24, 52);
+    c.fillText("?", 24, 52);
+  });
   // icons above heads
   make("icon-warn", 64, 64, (c) => {
     c.fillStyle = "#1b0d0d";

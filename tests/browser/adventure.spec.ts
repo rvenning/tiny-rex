@@ -25,14 +25,17 @@ test("keyboard movement, pause, journal and reload preserve adventure and old sa
   await page.keyboard.press("d");
   await page.waitForTimeout(200);
   expect(await position(page)).toEqual(paused);
-  await page.getByRole("button", { name: "Map & creature book" }).click();
+  await page.getByRole("button", { name: "Journal", exact: true }).click();
+  await expect(page.getByRole("tab", { name: /Quests/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /A Quiet Nest/ })).toBeVisible();
+  await page.getByRole("tab", { name: "Map" }).click();
   await expect(page.getByRole("img", { name: /World map/ })).toBeVisible();
-  await expect(page.getByText(/Triceratops: find Ancient ribs/)).toBeVisible();
   await page.getByRole("button", { name: /Continue exploring/ }).click();
   await page.getByRole("button", { name: "Pause", exact: true }).click();
-  await page.getByRole("button", { name: "Save & return home" }).click();
+  await page.getByRole("button", { name: /Save & choose another dinosaur/ }).click();
+  await expect(page.getByRole("heading", { name: "Choose your dinosaur" })).toBeVisible();
   const saved = await page.evaluate(
-    (id) => JSON.parse(localStorage.getItem("trex_adventure_v1_" + id)!),
+    (id) => { const book = JSON.parse(localStorage.getItem("trex_chars_v2_" + id)!); return book.characters[book.active]; },
     reviewProfile.id,
   );
   expect(saved.snapshot.position.x).toBeCloseTo(paused.x, 2);
@@ -78,7 +81,7 @@ for (const v of [
       expect(r.y + r.height).toBeLessThanOrEqual(v.height + 1);
     }
     await page.screenshot({ path: test.info().outputPath("gameplay.png") });
-    await page.getByRole("button", { name: "Map and creature book" }).click();
+    await page.getByRole("button", { name: /Journal, map and quests/ }).click();
     await expect(page.locator(".modal")).toBeVisible();
     expect(
       await page.evaluate(

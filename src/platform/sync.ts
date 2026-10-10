@@ -3,10 +3,13 @@ import { validateProfile, validateProgress } from "./validation";
 import { reconcile } from "./sync-plan";
 import { firebaseConfig } from "./firebase-config";
 import { mergeAdventure, validateAdventure } from "../adventure/save";
+import { validateCharacter } from "../rpg/character";
+import type { CharacterStore } from "../rpg/store";
 /** Lazy cloud adapter. Local play/saves never wait for connectivity. */
 export async function connectSync(
   store: SaveStore,
   status: (s: string) => void,
+  characters?: CharacterStore,
 ) {
   const queued = new Map<string, unknown>();
   let send: ((key: string, data: unknown) => Promise<void>) | undefined;
@@ -68,6 +71,7 @@ export async function connectSync(
         store,
         snapshot.docs.map((d) => ({ id: d.id, data: d.data() })),
         queued,
+        characters,
       );
       send = async (key, data) => {
         const ref = dbApi.doc(db, "tinyrex", key);

@@ -104,6 +104,7 @@ const SWAY: Record<string, [number, number]> = {
   grass_tuft: [3.4, 1.4], moss_clump: [0, 0], lily_pad: [0, 0],
 };
 interface PropRec {
+  tag?: string;
   name: string;
   frame: string;
   sx: number;
@@ -144,6 +145,26 @@ export class PropLayer {
   }
   get active() {
     return this.live.size;
+  }
+  /** runtime decoration (flag-driven world changes, landmarks); removed again with removeTag */
+  add(name: string, variant: number, x: number, y: number, z: number, scale: number, tag: string) {
+    const nv = propVariants.get(name);
+    if (!nv) return;
+    const frame = name + "/" + (variant % nv);
+    const p = proj(x, y, z);
+    const rec: PropRec = { name, frame, sx: p.x, sy: p.y, x, y, scale, kind: propMeta.get(frame)?.kind ?? "deco", tag };
+    this.recs.push(rec);
+    const k = Math.floor(p.x / this.cell) + "," + Math.floor(p.y / this.cell);
+    (this.cells.get(k) ?? this.cells.set(k, []).get(k)!).push(rec);
+  }
+  removeTag(tag: string) {
+    for (const r of this.recs) {
+      if (r.tag !== tag) continue;
+      r.removed = true;
+      r.img?.destroy();
+      r.img = undefined;
+      this.live.delete(r);
+    }
   }
   clearObstruction(name: string, x: number, y: number) {
     const rec = this.recs.filter(r => r.name === name && Math.hypot(r.x - x, r.y - y) < 3)

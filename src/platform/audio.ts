@@ -199,6 +199,77 @@ export class Audio {
       [294, 262, 233].forEach((f, i) => this.tone(f, 0.18, i * 0.1));
       return;
     }
+    if (kind === "crit") {
+      this.noise(0.1, 2400, 1.2, 0.07);
+      this.tone(420, 0.1, 0, "square", 0.04);
+      this.tone(840, 0.12, 0.03, "triangle", 0.045);
+      return;
+    }
+    if (kind === "levelup") {
+      [392, 494, 588, 784, 988].forEach((f, i) => this.tone(f, 0.28, i * 0.08, "triangle", 0.07));
+      this.tone(196, 0.6, 0, "sine", 0.05);
+      return;
+    }
+    if (kind === "quest") {
+      [523, 659, 784].forEach((f, i) => this.tone(f, 0.18, i * 0.09, "triangle", 0.06));
+      return;
+    }
+    if (kind === "questdone") {
+      [392, 523, 659, 784, 1046].forEach((f, i) => this.tone(f, 0.3, i * 0.1, "triangle", 0.06));
+      return;
+    }
+    if (kind === "loot-common") {
+      this.tone(660, 0.07, 0, "sine", 0.04);
+      return;
+    }
+    if (kind === "loot-rare") {
+      [660, 880].forEach((f, i) => this.tone(f, 0.12, i * 0.07, "sine", 0.05));
+      return;
+    }
+    if (kind === "loot-epic") {
+      [523, 659, 880, 1175].forEach((f, i) => this.tone(f, 0.2, i * 0.07, "triangle", 0.055));
+      return;
+    }
+    if (kind === "loot-legendary") {
+      [392, 523, 659, 784, 1046, 1318].forEach((f, i) => this.tone(f, 0.34, i * 0.09, "triangle", 0.065));
+      this.tone(131, 0.9, 0, "sine", 0.06);
+      return;
+    }
+    if (kind === "amber") {
+      this.tone(1200, 0.05, 0, "sine", 0.03);
+      this.tone(1600, 0.05, 0.04, "sine", 0.025);
+      return;
+    }
+    if (kind === "slam") {
+      this.noise(0.22, 180, 0.6, 0.12, 0, "lowpass");
+      this.tone(70, 0.3, 0, "triangle", 0.09);
+      return;
+    }
+    if (kind === "whoosh") {
+      this.noise(0.14, 1800, 0.9, 0.04);
+      return;
+    }
+    if (kind === "spit") {
+      this.noise(0.12, 2600, 1.5, 0.04);
+      this.tone(520, 0.1, 0, "sine", 0.03);
+      return;
+    }
+    if (kind === "perfect") {
+      this.tone(1046, 0.1, 0, "sine", 0.06);
+      this.tone(1568, 0.16, 0.06, "sine", 0.055);
+      return;
+    }
+    if (kind === "phase") {
+      this.tone(80, 0.6, 0, "sawtooth", 0.07);
+      this.tone(60, 0.7, 0.1, "triangle", 0.08);
+      this.noise(0.5, 300, 0.5, 0.06, 0, "lowpass");
+      return;
+    }
+    if (kind === "equip") {
+      this.noise(0.06, 1500, 1, 0.04);
+      this.tone(300, 0.1, 0, "triangle", 0.04);
+      return;
+    }
     this.tone(kind === "bump" ? 520 : 880, 0.06, 0, "sine", 0.035);
   }
 }

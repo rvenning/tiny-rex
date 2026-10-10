@@ -1,4 +1,4 @@
-import type { AdventureSave } from "../../adventure/save";
+import type { Character } from "../../rpg/character";
 import { DISCOVERIES, REGIONS, type Point } from "../../adventure/data";
 import type { WorldGrid } from "../../world/grid";
 
@@ -15,7 +15,7 @@ const COLORS: Record<string, string> = {
   ash: "#77736f",
 };
 /** Journal map: the real collision/surface grid, rotated to match the on-screen view. Unexplored regions stay in shadow. */
-export function worldMap(grid: WorldGrid, save: AdventureSave, player: Point) {
+export function worldMap(grid: WorldGrid, save: Pick<Character, "regions" | "nests" | "discoveries">, player: Point) {
   const s = 3.2,
     pad = 10;
   const canvas = document.createElement("canvas");

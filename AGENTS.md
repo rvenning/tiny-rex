@@ -9,6 +9,11 @@ species unlocks that REPLACES Endless Feast (no classic mode). See `docs/isometr
 `review-checkpoint.md`. The former game is recoverable from Git history (`29cdefb`).
 Use a branch and PR. Robert performs the final review; do not merge.
 
+The game is now an action RPG (permanent species per character, several characters per profile, mutation loot, skill tree,
+quests, bosses). Rules live in `src/rpg/`, the simulation in `src/adventure/`, authored content in
+`src/adventure/content/`; see `docs/arpg/` and `docs/isometric-adventure.md`. Save keys: `trex_chars_v2_<profile>` (new,
+per-character, with backup/good copies) beside the untouched legacy `trex_adventure_v1_*`.
+
 ## Commands
 
 ```sh

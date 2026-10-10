@@ -205,29 +205,32 @@ export function mergeAdventure(
 }
 export class AdventureStore {
   available = true;
-  read(id: string): AdventureSave {
+  constructor(private storage: Storage | null = typeof localStorage === "undefined" ? null : localStorage) {}
+  /** the stored record if one exists and is readable, otherwise null (callers must not invent progress from a miss) */
+  readExisting(id: string): AdventureSave | null {
     for (const suffix of ["", "_backup"]) {
       try {
-        const value = JSON.parse(
-          localStorage.getItem("trex_adventure_v1_" + id + suffix) || "null",
-        );
+        const value = JSON.parse(this.storage?.getItem("trex_adventure_v1_" + id + suffix) || "null");
         if (value?.version === 1) return validateAdventure(value);
       } catch {}
     }
-    return freshAdventure();
+    return null;
+  }
+  read(id: string): AdventureSave {
+    return this.readExisting(id) ?? freshAdventure();
   }
   write(id: string, data: AdventureSave) {
     const merged = mergeAdventure(this.read(id), data);
     try {
       const key = "trex_adventure_v1_" + id;
-      const old = localStorage.getItem(key);
+      const old = this.storage?.getItem(key);
       if (old) {
         try {
           if (JSON.parse(old)?.version === 1)
-            localStorage.setItem(key + "_backup", old);
+            this.storage?.setItem(key + "_backup", old);
         } catch {}
       }
-      localStorage.setItem(key, JSON.stringify(merged));
+      this.storage?.setItem(key, JSON.stringify(merged));
     } catch {
       this.available = false;
     }
