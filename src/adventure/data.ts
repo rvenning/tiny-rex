@@ -1,5 +1,6 @@
 /** Typed content tables for the connected world. Positions are world units (see world/projection.ts). */
 import { CONNECTED } from './connected-content';
+import { EXTRA_RIVALS, EXTRA_SPAWNS } from "./content";
 import { CREATURES } from "./bestiary";
 export type Dino = "rex" | "raptor" | "trike";
 export type RegionId =
@@ -287,6 +288,7 @@ export const RIVALS: Rival[] = [
   ...CONNECTED.rivals.map(r => ({...r, species: RIVAL_SPECIES[r.id] ?? r.species, home: {...r.home}, companions: 'companions' in r ? r.companions.map(p => ({...p})) : []})),
   // the Hollow's miniboss holds the old perch (formerly an unnamed sentinel raptor)
   { id: "old-scar", name: "Old Scar", species: "old-scar", region: "hollow" as RegionId, home: { x: 40.5, y: 31 }, companions: [] },
+  ...EXTRA_RIVALS.map((r) => ({ ...r, home: { ...r.home }, companions: (r.companions ?? []).map((p) => ({ ...p })) })),
 ];
 
 /** Initial population per region: [creature, x, y]. Hollow's raptor guards its perch. */
@@ -313,6 +315,11 @@ export const SPAWNS: Record<RegionId, [string, number, number][]> = {
 };
 export const SENTINELS = new Set(["old-scar@40.5,31"]);
 for (const id of ['river','marsh','dunes','ember','caves'] as RegionId[]) SPAWNS[id] = CONNECTED.spawns[id as keyof typeof CONNECTED.spawns].map(s => [...s] as [string,number,number]);
+/** content files add encounters on top of the generated population */
+for (const [id, x, y, level] of EXTRA_SPAWNS) {
+  const region = REGIONS.find((r) => x >= r.bounds[0] && x < r.bounds[2] && y >= r.bounds[1] && y < r.bounds[3])?.id ?? "hollow";
+  (SPAWNS[region] as [string, number, number, number?][]).push(level ? [id, x, y, level] : [id, x, y]);
+}
 export interface Gate extends Point { id:string; name:string; kind:string; requiredStage:number; width:number; normal:readonly number[]; fromRegion?:RegionId; toRegion?:RegionId; species?:Dino; optional?:boolean; prop?:string; action?:string; blurb?:string; }
 export interface Portal extends Point { id:string; name:string; to:Point; requiredStage:number; species?:Dino; bidirectional:boolean; optional:boolean; }
 export interface MasteryObjective { id:string; region:RegionId; name:string; kind:string; target?:string; count?:number; seconds?:number; reward:number; destination?:string; from?:Point; to?:Point; }

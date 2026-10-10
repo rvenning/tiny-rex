@@ -55,6 +55,7 @@ export type AdventureEvent = Point & {
   id?: string;
   radius?: number;
   hits?: number;
+  tag?: string;
 };
 
 export interface AdventureInput {
@@ -130,6 +131,10 @@ export interface Actor extends Point {
   /** boss attack counter, for alternating patterns */
   count: number;
   unaware: boolean;
+  /** quest that spawned this creature (cleared when the quest ends; tagged creatures never respawn) */
+  tag?: string;
+  /** hatchlings that trail the player during an escort */
+  follow?: boolean;
   /** accumulated damage-over-time not yet shown as a number */
   dotAcc: number;
   dotAt: number;

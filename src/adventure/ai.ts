@@ -115,6 +115,7 @@ function tickStatus(sim: Adventure, a: Actor, dt: number): boolean {
 }
 
 function updateNpc(sim: Adventure, a: Actor, dt: number, d: number) {
+  if (a.follow) return updateFollower(sim, a, dt, d);
   if (d < 6 && a.state !== "stagger") a.face = heading(a, sim.player);
   else if (a.t <= 0) {
     a.wander = sim.rng.range(0, Math.PI * 2);
@@ -524,4 +525,18 @@ export function triggerPhaseIfNeeded(sim: Adventure, a: Actor) {
     }
     break;
   }
+}
+
+/** hatchlings trailing the player: close the gap, hide while something attacks, and never get lost */
+function updateFollower(sim: Adventure, a: Actor, dt: number, d: number) {
+  const p = sim.player;
+  if (d > 20) {
+    const q = sim.world.grid.nearestWalkable(p.x - Math.cos(p.face) * 2.5, p.y - Math.sin(p.face) * 2.5, a.spec.r);
+    a.x = q.x;
+    a.y = q.y;
+    return;
+  }
+  const danger = sim.actors.some((o) => !o.npc && (o.state === "windup" || o.state === "strike") && dist(o, a) < 9);
+  if (d > 2.6 && !danger) goto(sim, a, p.x, p.y, a.spec.speed * (d > 8 ? 1.25 : 1), dt);
+  else a.face = heading(a, p);
 }

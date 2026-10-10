@@ -24,14 +24,16 @@ import type { World } from "../world/world";
 import { DIFFICULTY, type DiffSettings, FEAST_MAX, FEAST_PER_MEAL, blockedBy, effectiveLevel, enemyDamage, enemyHp, enemyXp, feastBonus, feastStacks, stageForLevel, xpDamping, xpForLevel, xpToNext } from "../rpg/progression";
 import { deriveStats, type Derived } from "../rpg/stats";
 import { activeById, availablePoints, canRank, defaultLoadout, rankUp, respecCost, unlockedActives } from "../rpg/skills";
-import { BAG_LIMIT, canWear, rerollAffix, rerollCost, salvageValue } from "../rpg/mutations";
+import { BAG_LIMIT, canWear, rerollAffix, rerollCost, rollMutation, salvageValue } from "../rpg/mutations";
 import { rollDrop, type Archetype as LootArchetype } from "../rpg/loot";
 import { validateCharacter, type Character } from "../rpg/character";
-import type { Drop, Mutation, Slot } from "../rpg/types";
+import type { Drop, Mutation, Rarity, Slot } from "../rpg/types";
 import type { Actor, AdventureEvent, AdventureInput, Decoy, Hazard, Player, Shot } from "./sim-types";
 import { updateActor as aiUpdateActor, updateShots, triggerPhaseIfNeeded } from "./ai";
 import { beginSkill, castSkill } from "./skill-impl";
 import { HAZARDS } from "./hazards";
+import { QuestEngine, type DialogueSession, type NpcDef, type QuestHost, type SpawnDef } from "./quests";
+import { NPCS, QUESTS } from "./content";
 
 export type { Actor, AdventureEvent, AdventureInput, ActorState, Player, PlayerPose, Shot } from "./sim-types";
 export { idleInput } from "./sim-types";
@@ -52,6 +54,8 @@ const hash2 = (x: number, y: number) => {
 };
 
 export interface SpawnOptions {
+  tag?: string;
+  follow?: boolean;
   level?: number;
   rival?: string;
   elite?: boolean;
@@ -104,6 +108,9 @@ export class Adventure {
   /** extra listeners (quest engine, tests) that want to see every event as it is emitted */
   listeners: ((e: AdventureEvent) => void)[] = [];
   diff: DiffSettings = DIFFICULTY.standard;
+  quests!: QuestEngine;
+  /** the conversation the UI should show right now (set by interact(), cleared by closeDialogue) */
+  dialogue: DialogueSession | null = null;
 
   constructor(
     readonly world: World,
@@ -165,6 +172,127 @@ export class Adventure {
     this.populate();
     this.hazards = HAZARDS.map((h) => ({ ...h }));
     for (const dr of this.save.drops) if (dr.expires > this.time) this.drops.push({ ...dr });
+    this.quests = new QuestEngine(this.questHost(), QUESTS, NPCS);
+    this.quests.setRegionLookup((q) => regionAt(q)?.id);
+    this.listeners.push((e) => this.quests.handle(e));
+    this.questLine = () => {
+      const t = this.quests.tracker();
+      return t ? { text: t.text, target: t.target } : null;
+    };
+    this.quests.boot();
+  }
+
+  // ---------------------------------------------------------------- quests
+  private npcActor(id: string) {
+    return this.actors.find((a) => a.npc === id && a.state !== "dead");
+  }
+  private spawnNpc(n: NpcDef) {
+    if (this.npcActor(n.id)) return;
+    const a = this.addActor(n.creature, n.home, { npc: n.id, exact: true });
+    if (a) {
+      a.spec = { ...a.spec, name: n.name, scale: n.scale ?? a.spec.scale, tint: n.tint ?? a.spec.tint };
+    }
+  }
+  private questHost(): QuestHost {
+    const sim = this;
+    return {
+      get save() {
+        return sim.save;
+      },
+      get player() {
+        return sim.player;
+      },
+      get time() {
+        return sim.time;
+      },
+      get level() {
+        return sim.level;
+      },
+      emitEvent: (t, at, e) => sim.emit(t, at, e),
+      spawnTagged: (tag, def) => sim.spawnTagged(tag, def),
+      clearTagged: (tag) => {
+        sim.actors = sim.actors.filter((a) => a.tag !== tag && a.tag !== tag + ":esc");
+      },
+      countTagged: (tag, alive) => sim.actors.filter((a) => a.tag === tag && (!alive || a.state !== "dead") && !a.npc).length,
+      gainXp: (n, at) => void sim.gainXp(n, at),
+      giveLoot: (spec) => void sim.giveLoot(spec),
+      setFlag: (f) => void sim.setFlag(f),
+      npcPosition: (id) => {
+        const a = sim.npcActor(id);
+        return a ? { x: a.x, y: a.y } : (NPCS.find((n) => n.id === id)?.home ?? null);
+      },
+      nearestActor: (pred) => {
+        let best: Actor | undefined,
+          bd = 1e9;
+        for (const a of sim.actors) {
+          if (a.state === "dead" || a.npc || !pred(a)) continue;
+          const d = dist(a, sim.player);
+          if (d < bd) {
+            bd = d;
+            best = a;
+          }
+        }
+        return best ? { x: best.x, y: best.y } : null;
+      },
+      rivalHome: (id) => {
+        const a = sim.actors.find((x) => x.rival === id && x.state !== "dead");
+        return a ? { x: a.x, y: a.y } : (RIVALS.find((r) => r.id === id)?.home ?? null);
+      },
+      discoveryAt: (id) => DISCOVERIES.find((d) => d.id === id) ?? null,
+      escortStart: (tag, from, count) => sim.escortStart(tag, from, count),
+      escortHome: (tag) => {
+        const kids = sim.actors.filter((a) => a.tag === tag + ":esc" && a.state !== "dead");
+        return { alive: kids.length, near: kids.filter((a) => dist(a, sim.player) < 6).length };
+      },
+      escortRelease: (tag) => {
+        for (const a of sim.actors) if (a.tag === tag + ":esc") a.follow = false;
+      },
+    };
+  }
+  spawnTagged(tag: string, def: SpawnDef) {
+    const n = def.count ?? 1;
+    for (let i = 0; i < n; i++) {
+      const ang = (i / Math.max(1, n)) * Math.PI * 2 + 0.7,
+        r = n > 1 ? (def.spread ?? 1.5) : 0;
+      const at = { x: def.at.x + Math.cos(ang) * r, y: def.at.y + Math.sin(ang) * r };
+      const a = this.addActor(def.id, at, { tag, level: def.level, exact: true, dormant: def.dormant, npc: def.npc });
+      if (a && !def.npc) {
+        a.provoked = 0;
+        if (def.dormant) a.state = "dormant";
+      }
+    }
+  }
+  /** hatchlings that already stand near the start are adopted; the rest are spawned, so the escort can always be completed */
+  escortStart(tag: string, from: Point, count: number) {
+    const mine = this.actors.filter((a) => a.tag === tag + ":esc" && a.state !== "dead");
+    for (const a of this.actors) {
+      if (mine.length >= count) break;
+      if (a.spec.id === "hatchling" && a.state !== "dead" && !a.follow && dist(a, from) < 10) {
+        a.tag = tag + ":esc";
+        a.follow = true;
+        mine.push(a);
+      }
+    }
+    while (mine.length < count) {
+      const a = this.addActor("hatchling", { x: from.x + this.rng.range(-1, 1), y: from.y + this.rng.range(-1, 1) }, { npc: "hatchling", exact: true });
+      if (!a) break;
+      a.tag = tag + ":esc";
+      a.follow = true;
+      mine.push(a);
+    }
+  }
+  giveLoot(spec: { rarity: Rarity; slot?: Slot; unique?: string }) {
+    const m = rollMutation({ seed: Math.floor(this.lootRng.next() * 0xffffffff), ilvl: Math.max(1, this.level), species: this.dino, rarity: spec.rarity, slot: spec.slot, unique: spec.unique, at: Math.floor(this.time) });
+    this.save.stats.mutationsFound++;
+    if (this.save.bag.length >= BAG_LIMIT) this.addDrop({ mutation: m }, { x: this.player.x + 1, y: this.player.y + 1 }, 600);
+    else this.save.bag.push({ ...m, fresh: true });
+    this.emit("pickup", this.player, { kind: "mutation", rarity: m.rarity, text: m.name, id: m.id });
+    return m;
+  }
+  closeDialogue(choice?: string) {
+    const s = this.dialogue;
+    this.dialogue = null;
+    if (s) this.quests.finishDialogue(s.id, choice);
   }
 
   // ---------------------------------------------------------------- derived state
@@ -231,6 +359,7 @@ export class Adventure {
   setFlag(id: string) {
     if (this.hasFlag(id)) return false;
     this.save.flags.push(id);
+    for (const n of NPCS) if (n.appears === id) this.spawnNpc(n);
     this.emit("world", this.player, { id });
     return true;
   }
@@ -262,6 +391,7 @@ export class Adventure {
       this.addActor(rival.species, rival.home, { rival: rival.id });
       for (const companion of rival.companions ?? []) this.addActor(rival.species, companion, { rival: rival.id });
     }
+    for (const n of NPCS) if (!n.appears || this.save.flags.includes(n.appears)) this.spawnNpc(n);
   }
   emit(type: AdventureEvent["type"], at: Point, extra: Partial<AdventureEvent> = {}) {
     const e = { type, x: at.x, y: at.y, ...extra } as AdventureEvent;
@@ -346,6 +476,8 @@ export class Adventure {
       speedMul: 1,
       cdMul: 1,
       summoned: o.summoned,
+      tag: o.tag,
+      follow: o.follow,
       lure: null,
       lureT: 0,
       guard: 0,
@@ -767,6 +899,7 @@ export class Adventure {
     this.updateDiscoveries();
     this.updateMastery(dt);
     this.updateDrops(dt);
+    this.quests.update(dt);
     if (this.pendingGrow && this.quiet > 0.5) this.applyGrowth();
     // regeneration: fast at a refuge, gentle in calm, and a little from Feast / mutations in combat
     const maxHp = this.d.maxHp;
@@ -1191,7 +1324,7 @@ export class Adventure {
     if (prey && !this.save.challenges.includes("first-hunt")) this.save.challenges.push("first-hunt");
     a.state = "dead";
     a.fx = {};
-    a.respawnAt = this.time + (a.rival || a.summoned ? 1e9 : prey ? 45 : a.elite ? 150 : 90);
+    a.respawnAt = this.time + (a.rival || a.summoned || a.tag ? 1e9 : prey ? 45 : a.elite ? 150 : 90);
     if (!this.save.studied.includes(a.spec.id)) this.save.studied.push(a.spec.id);
     this.save.stats.kills++;
     const stale = this.eatenRecent.filter((x) => x === a.spec.id).length;
@@ -1238,7 +1371,7 @@ export class Adventure {
   }
   /** quest engine and tests observe kills through the generic event stream */
   private signalKill(a: Actor) {
-    this.emit("kill", a, { id: a.spec.id, actor: a.id, text: a.rival ?? "", kind: a.spec.archetype });
+    this.emit("kill", a, { id: a.spec.id, actor: a.id, text: a.rival ?? "", kind: a.spec.archetype, tag: a.tag });
   }
   private rollLoot(a: Actor) {
     if (a.summoned || a.npc || a.spec.archetype === "neutral") return;
@@ -1360,6 +1493,7 @@ export class Adventure {
         a.cdMul = 1;
       }
     }
+    this.quests.onDefeat();
     this.emit("defeat", p, { text: lost > 0 ? `Back at the nest · ${lost} Amber waits where you fell` : "Back at the nest · your growth and discoveries are safe", amount: lost });
   }
 
@@ -1423,8 +1557,9 @@ export class Adventure {
     const npc = this.nearNpc;
     if (npc) {
       npc.face = heading(npc, this.player);
+      this.dialogue = this.quests.talk(npc.npc!);
       this.emit("dialogue", npc, { id: npc.npc, actor: npc.id });
-      return "talk";
+      return this.dialogue ? "talk" : "";
     }
     const portal = this.nearPortal;
     if (portal) {

@@ -5,6 +5,7 @@ import { Adventure, idleInput } from "../src/adventure/sim";
 import { DISCOVERIES, GATES, OBJECTIVES, REGIONS, RIVALS, PORTALS, SPAWNS, regionAt } from "../src/adventure/data";
 import { parseWorld, type WorldMeta } from "../src/world/world";
 import { xpForLevel } from "../src/rpg/progression";
+import { NPCS } from "../src/adventure/content";
 import { make, makeChar, openWorld, tick, place, held } from "./helpers/sim";
 
 const move = (a: Adventure, x: number, y: number, n = 90) => tick(a, n, held({ move: { x, y } }));
@@ -25,7 +26,8 @@ describe("Connected world content", () => {
     const world = realWorld();
     const a = new Adventure(world, makeChar());
     const ordinary = Object.values(SPAWNS).flat().filter(([id, x, y]) => !RIVALS.some((r) => r.species === id && [r.home, ...(r.companions ?? [])].some((p) => p.x === x && p.y === y))).length;
-    expect(a.actors).toHaveLength(ordinary + RIVALS.reduce((n, r) => n + 1 + (r.companions?.length ?? 0), 0));
+    const npcs = NPCS.filter((n) => !n.appears).length;
+    expect(a.actors).toHaveLength(ordinary + npcs + RIVALS.reduce((n, r) => n + 1 + (r.companions?.length ?? 0), 0));
     for (const actor of a.actors) {
       expect(world.grid.fits(actor.x, actor.y, actor.spec.r), actor.spec.id + " spawn").toBe(true);
       expect(world.grid.fits(actor.home.x, actor.home.y, actor.spec.r), actor.spec.id + " return home").toBe(true);
