@@ -19,6 +19,11 @@ sys.path.insert(0, HERE)
 from worldgen import SURF  # noqa
 
 
+# (x0, y0, x1, y1) in world units. The Hollow creek ford route runs along the north bank to the shallows near x=51-60;
+# in the connected river layout that crossing narrowed to a half-unit gap, stranding the ford and the fossil shelf.
+CARVES = [(50.5, 26.2, 54.5, 28.2), (56.6, 27.0, 60.4, 29.2)]
+
+
 def export(src, dst):
     d = np.load(os.path.join(src, "terrain.npz"))
     props = json.load(open(os.path.join(src, "props.json")))
@@ -44,6 +49,10 @@ def export(src, dst):
     depth = np.where(wet, water - z, 0.0)
     deep = wet & (depth > 0.55)
     walk &= ~deep
+    # Guaranteed connections the generator's rivers can pinch to diagonal-only: wade-able gaps (never through deep water).
+    for (cx0, cy0, cx1, cy1) in CARVES:
+        m = (X >= cx0) & (X <= cx1) & (Y >= cy0) & (Y <= cy1) & ~deep
+        walk |= m
     flags = (walk * 1 | wet * 2 | deep * 4 | steep * 8).astype(np.uint8)
     dom = np.argmax(surf, axis=0).astype(np.uint8)
     zc = np.clip(np.round(z * 100), -32000, 32000).astype(np.int16)

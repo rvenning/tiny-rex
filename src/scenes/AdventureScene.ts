@@ -9,6 +9,8 @@ import type { World } from "../world/world";
 import { ActorView } from "./adventure/actor-view";
 import { hasCreature, loadCreature, loadProps, unloadCreature } from "./adventure/assets";
 import { Fx, makeTextures } from "./adventure/fx";
+import { Ambient } from "./adventure/ambient";
+import { findRoute } from "../adventure/guide";
 import { GroundLayer, PropLayer } from "./adventure/world-view";
 
 const dist = (a: Point, b: Point) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -39,6 +41,11 @@ export class AdventureScene extends Phaser.Scene {
   private ground!: GroundLayer;
   private props!: PropLayer;
   private fx!: Fx;
+  private ambient?: Ambient;
+  private route: Point[] = [];
+  private routeTimer = 0;
+  private guideArrow?: Phaser.GameObjects.Image;
+  private guideMark?: Phaser.GameObjects.Image;
   private cues!: Phaser.GameObjects.Graphics;
   private views = new Map<number, ActorView>();
   private icons = new Map<number, Phaser.GameObjects.Image>();
@@ -139,6 +146,7 @@ export class AdventureScene extends Phaser.Scene {
     if (!this.sys.isActive()) return;
     this.ground = new GroundLayer(this, this.world);
     this.props = new PropLayer(this, this.world);
+    this.ambient = new Ambient(this, this.fx, this.world.grid, this.reduced, this.world.meta.features as never);
     for (const d of DISCOVERIES) {
       const m = this.add.image(0, 0, "icon-find").setScale(0.5).setVisible(false);
       this.markers.set(d.id, m);
@@ -255,6 +263,8 @@ export class AdventureScene extends Phaser.Scene {
     this.loadingEl?.remove();
     this.ground?.destroy();
     this.props?.destroy();
+    this.ambient?.destroy();
+    this.ambient = undefined;
     this.fx?.destroy();
     for (const v of this.views.values()) v.destroy();
     this.views.clear();
@@ -353,11 +363,58 @@ export class AdventureScene extends Phaser.Scene {
     const view = this.cameras.main.worldView;
     this.ground.update(view);
     this.props.update(view);
+    this.animateWorld(dt, view);
+    this.updateGuide(dt);
     this.draw(dt);
     this.streamCreatures(dt);
     this.fx.update(dt);
     this.updateHud(dt);
     this.updateFloaters(dt);
+  }
+  /** objective guidance: a pulsing arrow beside the player along the real walkable route, a goal marker, a minimap trail */
+  private updateGuide(dt: number) {
+    const s = this.sim,
+      p = s.player;
+    const target = s.objectiveTarget;
+    this.routeTimer -= dt;
+    const far = !!target && dist(target, p) > 7;
+    if (this.routeTimer <= 0) {
+      this.routeTimer = 1.4;
+      this.route = far && target ? findRoute(this.world.grid, p, target) : [];
+    }
+    if (!this.guideArrow) {
+      this.guideArrow = this.add.image(0, 0, "icon-arrow").setDepth(9.5e5).setScale(0.62);
+      this.guideMark = this.add.image(0, 0, "icon-find").setDepth(9.5e5).setScale(0.62).setTint(0xffd36a);
+    }
+    const hide = !far || !target || s.player.hp <= 0;
+    this.guideArrow.setVisible(!hide);
+    const mark = this.guideMark!;
+    const creatureTarget = !!target && s.actors.some((a) => a.state !== "dead" && dist(a, target) < 1.3);
+    if (hide || !target) {
+      mark.setVisible(false);
+      return;
+    }
+    const next = this.route.find((q) => dist(q, p) > 6) ?? this.route.at(-1) ?? target;
+    const a = proj(p.x, p.y, this.world.grid.height(p.x, p.y)),
+      b = proj(next.x, next.y, this.world.grid.height(next.x, next.y));
+    const ang = Math.atan2(b.y - a.y, b.x - a.x);
+    const reach = 120 + 6 * Math.sin(s.time * 4);
+    const threat = s.actors.some((x) => x.state === "windup" || x.state === "strike");
+    this.guideArrow.setPosition(a.x + Math.cos(ang) * reach, a.y - 30 + Math.sin(ang) * reach * 0.8).setRotation(ang).setAlpha(threat ? 0.3 : 0.9);
+    const tp = proj(target.x, target.y, this.world.grid.height(target.x, target.y) + 1.6 + Math.sin(s.time * 3) * 0.12);
+    mark.setVisible(!creatureTarget && this.cameras.main.worldView.contains(tp.x, tp.y)).setPosition(tp.x, tp.y).setDepth(tp.y + 40);
+  }
+  private animateWorld(dt: number, view: Phaser.Geom.Rectangle) {
+    const sim = this.sim;
+    const movers = [{ x: sim.player.x, y: sim.player.y, r: sim.radius }];
+    const wading = [{ x: sim.player.x, y: sim.player.y, r: sim.radius }];
+    for (const a of sim.actors) {
+      if (a.state === "dead" || dist(a, sim.player) > 18) continue;
+      if (a.spec.role !== "prey" || a.speedNow > 0.4) movers.push({ x: a.x, y: a.y, r: a.spec.r });
+      if (a.speedNow > 0.4) wading.push({ x: a.x, y: a.y, r: a.spec.r });
+    }
+    this.props.sway(sim.time, dt, this.ambient?.wind ?? 0.2, movers);
+    this.ambient?.update(dt, view, this.cameras.main.zoom, sim.player.speedNow > 0.4 ? wading : wading.slice(1));
   }
   private async onTier() {
     const first = this.lastTier < 0;
@@ -758,7 +815,7 @@ export class AdventureScene extends Phaser.Scene {
         hp: Math.max(0, s.player.hp),
         growth: s.growth,
         region: byRegion(s.region).name,
-        objective: s.objective,
+        objective: s.objective + (s.objectiveTarget && dist(s.objectiveTarget, s.player) > 12 ? ` · ${Math.round(dist(s.objectiveTarget, s.player))} m` : ""),
         cooldown: { bite: cd(s.biteCooldown, spec.biteCd), dodge: cd(s.dodgeCooldown, spec.dodgeCd), skill: cd(s.skillCooldown, spec.skillCd) },
         skillName: spec.skillName,
         skillLocked: s.tier < spec.skillStage,
@@ -778,7 +835,9 @@ export class AdventureScene extends Phaser.Scene {
         if (dist(portal, s.player) < 40) mk.push({ x: portal.x, y: portal.y, kind: "goal" });
         if (portal.bidirectional && dist(portal.to, s.player) < 40) mk.push({ x: portal.to.x, y: portal.to.y, kind: "goal" });
       }
-      this.hud.drawMap(s.player.x, s.player.y, mk);
+      const goal = s.objectiveTarget;
+      if (goal && dist(goal, s.player) > 7) mk.push({ x: goal.x, y: goal.y, kind: "goal" });
+      this.hud.drawMap(s.player.x, s.player.y, mk, this.route);
     }
   }
   private portraitCache?: { key: string; canvas: HTMLCanvasElement };

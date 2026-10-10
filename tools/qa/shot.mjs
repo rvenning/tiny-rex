@@ -22,6 +22,7 @@ try {
     const [x, y] = at.split(",").map(Number);
     await page.evaluate(([x, y]) => { const s = window.__rex.game.scene.getScene("Adventure"); s.sim.player.x = x; s.sim.player.y = y; s.snapCamera?.(); }, [x, y]);
   }
+  if (process.env.XP) await page.evaluate((xp) => { const s = window.__rex.game.scene.getScene('Adventure'); s.sim.save.xp.rex = +xp; }, process.env.XP);
   await page.waitForTimeout(3500);
   await page.screenshot({ path: out });
   console.log(JSON.stringify(await page.evaluate(() => window.adventureDiagnostics())).slice(0, 400));

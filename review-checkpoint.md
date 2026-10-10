@@ -1,25 +1,27 @@
-# Review checkpoint: Fern Hollow is playable (2026-10-10)
+# Review checkpoint: connected world is live-ready (2026-10-10, second pass)
 
-Branch `rebuild/isometric-world` (draft PR against `main`; live game unchanged, merge is Robert's call).
-Preview: `npm ci && npm run dev -- --port 8125`, then http://127.0.0.1:8125/tiny-rex/ (pick a profile, Continue).
-Screenshots come from an isolated browser (Firebase and websockets blocked, throwaway storage): `node tools/qa/shot.mjs out.png 1448 1086 [x,y]`.
+Branch `polish/hollow-ground` (on top of merged PR #3). Run: `npm ci && npm run dev -- --port 8125`.
+Isolated captures: `node tools/qa/shot.mjs out.png 1366 1024 [x,y]` (Firebase blocked, throwaway storage).
 
-| Screenshot | Shows |
+## Fixed from your reports
+- **Stuck at "Cross the shallow ford into Reed Marsh":** the objective chain assumed six regions but the deployed world only contained Fern Hollow. The full connected world (Riverbend, Reed Marsh, Sunscar dunes, Ember Basin, Echo Caves; 322 ground tiles) is now the active world, and the Hollow creek ford route was re-opened in the connected layout (`tools/world/export.py` CARVES; a half-unit pinch had cut off the ford and fossil shelf).
+- **No way to know where to go:** objectives now have a target. A pulsing arrow beside the player follows an A* route over the real collision grid (`src/adventure/guide.ts`), the minimap shows the route and a goal marker, and the objective chip shows the distance.
+- **Triceratops did nothing:** the player sprite only swapped on growth stage, not species. Fixed.
+- **Resizing lost the plot:** the canvas CSS box lagged one resize behind the window. Fixed (`src/main.ts`, `tools/qa/resize.mjs`).
+- **Static environment / static waterfall:** plants sway in a travelling wind and bend away from anything walking through them; the waterfall has streaming water and mist; water glints, ripples when wading, drifting leaves and pollen, cloud shadows, light shafts and passing birds. Desktop sample: median 16.7 ms/frame (headless Chrome, not an iPad result).
+
+## Art
+- Fern Hollow ground re-baked: clustered clutter, ragged dirt/grass edges, dappled canopy shade on the dirt, deeper smoother water with a finer shoreline.
+- Ember Basin: glowing lava fissures through basalt. Marsh/Riverbend: reed lanes, cattails, lily pads, ferns (`tools/world/dress_regions.py`, art-only).
+- All tiles re-published with seam gutters (322 WebP, 6.9 MiB).
+
+| Screenshot | |
 | --- | --- |
-| `docs/review/01-opening-d.jpg` | start nest, clustered ground clutter, layered fringe (compare `art-reference/01-early-fern-hollow.png`) |
-| `docs/review/02-perch-raptor.jpg` | raptor recovery window and "Vulnerable · bite now" prompt, mossy rocky bank |
-| `docs/review/03-ipad-landscape.jpg`, `04-ipad-portrait.jpg` | responsive HUD at 1366x1024 and 820x1180 |
-| `docs/review/05-title.jpg` | title over the live valley |
-| `docs/review/06-waterfall-pool.jpg`, `07-log-arch.jpg` | waterfall pool with columnar cliff; fallen-log arch (props fade when they hide the hatchling) |
+| `docs/review/01-opening-d.jpg` | Fern Hollow opening |
+| `docs/review/06-waterfall-pool.jpg` | waterfall pool (animated at runtime) |
+| `docs/review/08-reed-marsh.jpg`, `09-ember-basin.jpg`, `10-dunes.jpg` | new regions |
+| `docs/review/11-objective-arrow.jpg` | objective arrow and distance |
 
-## What changed in this pass
-- Adopted Codex's repaired snapshot (compiling, packed atlases, 117 ground tiles, save migration). Connected six-region world (`public/world-connected`) is NOT adopted; 2 tests that need it are skipped.
-- Camera closer (hatchling ~13% of width), warm light + forest vignette, title scrim.
-- Ground re-baked (35 tiles around the opening): clustered tufts/clover/pebble fields instead of an even grid, ragged dirt/grass edges, stones through the shallows. Start nest with eggs, ringed boulders, denser fern/broadleaf fringe (`tools/world/dress_hollow.py`).
-- Apex Rex claw-scar markings softened and re-rendered; props that hide the player fade; open-book icon; ambient jungle bed (wind, water proximity, birds, insects) and impact sounds.
-- Verification: `tsc` clean, 61 unit tests pass (2 skipped), production build passes (65 precache entries, ~9.7 MiB).
-
-## Known gaps
-1. Large flat dirt expanse east of the nest still reads bare next to the mockup; creek bank foam is saw-toothed; no canopy dapple on the dirt.
-2. Rex stages 0-2 markings not revisited; portraits are crops of idle frames.
-3. Other regions (River to Caves) exist only in Codex's copy; physical iPad performance, audio mix and human playtests are unverified. Tests do not prove fun.
+## Honest gaps
+- Sunscar dunes and Echo Caves are bare: sand/rock with few props and no biome-specific plants or rock kit; Riverbend still has a large dirt expanse; the non-Hollow ground tiles are half resolution.
+- Creek bank foam, Rex stages 0-2 markings, physical iPad performance, audio mix and human playtests are unverified. Tests do not prove fun.
