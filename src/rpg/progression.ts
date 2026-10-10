@@ -76,9 +76,9 @@ export interface SpeciesBase {
   slotBLevel: number;
 }
 export const SPECIES: Record<Dino, SpeciesBase> = {
-  rex: { hp: 130, hpPerLevel: 10, damage: 12, swing: 0.38, chain: 3, crit: 0.05, armour: 0.0, dodgeCd: 1.0, slotBLevel: 5 },
-  raptor: { hp: 90, hpPerLevel: 7, damage: 7.5, swing: 0.24, chain: 4, crit: 0.12, armour: 0.0, dodgeCd: 0.8, slotBLevel: 5 },
-  trike: { hp: 150, hpPerLevel: 11, damage: 10, swing: 0.46, chain: 3, crit: 0.04, armour: 0.15, dodgeCd: 1.15, slotBLevel: 5 },
+  rex: { hp: 130, hpPerLevel: 13, damage: 12, swing: 0.38, chain: 3, crit: 0.05, armour: 0.0, dodgeCd: 1.0, slotBLevel: 5 },
+  raptor: { hp: 90, hpPerLevel: 10, damage: 7.5, swing: 0.24, chain: 4, crit: 0.12, armour: 0.0, dodgeCd: 0.8, slotBLevel: 5 },
+  trike: { hp: 150, hpPerLevel: 14, damage: 10, swing: 0.46, chain: 3, crit: 0.04, armour: 0.15, dodgeCd: 1.0, slotBLevel: 5 },
 };
 /** base damage of one basic hit before mutations and skills */
 export const baseDamage = (dino: Dino, level: number, stage: number) => SPECIES[dino].damage * (1 + 0.09 * (level - 1)) * (1 + 0.15 * stage);

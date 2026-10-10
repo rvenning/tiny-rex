@@ -101,23 +101,23 @@ export const CREATURES: CreatureSpec[] = [
   { id: "hypsi", name: "Hypsilophodon", sprite: "hypsilophodon", role: "prey", archetype: "prey", level: 3, r: 0.55, speed: 5.1, hp: 16, power: 1, reward: 5, sense: 9, scale: 1, fact: "A nimble grazer. It bolts when you break into a run." },
   // ------------------------------------------------------------------ rushers and swarms
   {
-    id: "raptor", name: "Velociraptor", sprite: "raptor", role: "lunger", archetype: "rusher", level: 3, r: 0.7, speed: 5.8, hp: 60, power: 2, reward: 14, sense: 11, scale: 1,
+    id: "raptor", name: "Velociraptor", sprite: "raptor", role: "lunger", archetype: "rusher", level: 3, r: 0.7, speed: 5.8, hp: 90, power: 2, reward: 14, sense: 11, scale: 1,
     fact: "Feathered, turkey-sized in life, with a hooked claw on each foot.",
     windup: 0.85, strike: 0.36, recover: 1.25, reach: 4.8, arc: 0.3, lungeSpeed: 12, damage: 1, cooldown: 1.4,
   },
   {
-    id: "compy-raider", name: "Compy raider", sprite: "compy", role: "lunger", archetype: "swarm", level: 2, r: 0.38, speed: 6.1, hp: 15, power: 0, reward: 4, sense: 9, scale: 1.05, tint: 0xffd9b0,
+    id: "compy-raider", name: "Compy raider", sprite: "compy", role: "lunger", archetype: "swarm", level: 2, r: 0.38, speed: 6.1, hp: 22, power: 0, reward: 4, sense: 9, scale: 1.05, tint: 0xffd9b0,
     fact: "Alone they are nothing. In a pack of six, treat them like a raptor.",
     attacks: [L({ id: "nip", name: "Nip", windup: 0.5, strike: 0.26, recover: 0.8, reach: 2.6, arc: 0.4, damage: 0.3, speed: 11, cd: 1.1 })],
   },
   {
-    id: "oviraptor", name: "Oviraptor", sprite: "oviraptor", role: "lunger", archetype: "rusher", level: 4, r: 0.65, speed: 5.0, hp: 36, power: 1, reward: 8, sense: 9, scale: 1,
+    id: "oviraptor", name: "Oviraptor", sprite: "oviraptor", role: "lunger", archetype: "rusher", level: 4, r: 0.65, speed: 5.0, hp: 54, power: 1, reward: 8, sense: 9, scale: 1,
     fact: "Its name came from a mistaken reading of a nest.",
     windup: 0.8, strike: 0.34, recover: 1.1, reach: 4.0, arc: 0.3, lungeSpeed: 11, damage: 0.8, cooldown: 1.6,
   },
   // ------------------------------------------------------------------ ranged, support, ambusher, tank
   {
-    id: "dilo", name: "Dilophosaurus", sprite: "dilophosaurus", role: "lunger", archetype: "ranged", level: 6, r: 0.85, speed: 4.8, hp: 90, power: 3, reward: 22, sense: 12, scale: 1, keepAway: 7.5,
+    id: "dilo", name: "Dilophosaurus", sprite: "dilophosaurus", role: "lunger", archetype: "ranged", level: 6, r: 0.85, speed: 4.8, hp: 135, power: 3, reward: 22, sense: 12, scale: 1, keepAway: 7.5,
     fact: "The real animal had two thin head crests and no neck frill. Spitting venom is a storybook habit.",
     attacks: [
       L({ id: "spit", kind: "spit", name: "Venom spit", windup: 0.9, strike: 0.2, recover: 1.05, reach: 14, damage: 0.7, speed: 11, range: [4.5, 13], cd: 2.4, venom: true, weight: 3 }),
@@ -125,7 +125,7 @@ export const CREATURES: CreatureSpec[] = [
     ],
   },
   {
-    id: "caller", name: "Brood Caller", sprite: "oviraptor", role: "lunger", archetype: "support", level: 5, r: 0.62, speed: 5.0, hp: 44, power: 1, reward: 12, sense: 12, scale: 1.08, tint: 0xb9ffd0, keepAway: 8,
+    id: "caller", name: "Brood Caller", sprite: "oviraptor", role: "lunger", archetype: "support", level: 5, r: 0.62, speed: 5.0, hp: 66, power: 1, reward: 12, sense: 12, scale: 1.08, tint: 0xb9ffd0, keepAway: 8,
     fact: "Its crest rattles to rally the pack. Silence it first.",
     attacks: [
       L({ id: "rally", kind: "rally", name: "Rally cry", windup: 0.9, strike: 0.3, recover: 0.8, reach: 7, damage: 0, cd: 7, range: [0, 99], weight: 3 }),
@@ -133,12 +133,12 @@ export const CREATURES: CreatureSpec[] = [
     ],
   },
   {
-    id: "lurker", name: "Reed lurker", sprite: "raptor", role: "lunger", archetype: "ambusher", level: 5, r: 0.62, speed: 6.4, hp: 48, power: 2, reward: 16, sense: 3.8, scale: 0.92, tint: 0x9fd8a8,
+    id: "lurker", name: "Reed lurker", sprite: "raptor", role: "lunger", archetype: "ambusher", level: 5, r: 0.62, speed: 6.4, hp: 72, power: 2, reward: 16, sense: 3.8, scale: 0.92, tint: 0x9fd8a8,
     fact: "It lies motionless in the reeds until you are almost on it. Listen for the rustle.",
     attacks: [L({ id: "ambush", name: "Ambush", windup: 0.45, strike: 0.34, recover: 1.2, reach: 4.2, arc: 0.35, damage: 1.1, speed: 14, cd: 1.5 })],
   },
   {
-    id: "kentro", name: "Kentrosaurus", sprite: "kentro", role: "armour", archetype: "tank", level: 6, r: 0.95, speed: 2.8, hp: 130, power: 2, reward: 10, sense: 6, scale: 1, frontal: 0.35,
+    id: "kentro", name: "Kentrosaurus", sprite: "kentro", role: "armour", archetype: "tank", level: 6, r: 0.95, speed: 2.8, hp: 190, power: 2, reward: 10, sense: 6, scale: 1, frontal: 0.35,
     fact: "Its spikes turn aside blows from the front. Circle to its flank.",
     attacks: [L({ id: "tailswipe", kind: "sweep", name: "Tail swipe", windup: 0.95, strike: 0.4, recover: 1.5, reach: 3.8, arc: 1.5, damage: 1.2, cd: 2.4, knock: 3 })],
   },
@@ -149,7 +149,7 @@ export const CREATURES: CreatureSpec[] = [
   },
   // ------------------------------------------------------------------ bosses and minibosses
   {
-    id: "old-scar", name: "Old Scar", sprite: "raptor", role: "lunger", archetype: "miniboss", level: 4, r: 1.0, speed: 6.0, hp: 190, power: 3, reward: 40, sense: 13, scale: 1.45, tint: 0xd6b79c,
+    id: "old-scar", name: "Old Scar", sprite: "raptor", role: "lunger", archetype: "miniboss", level: 4, r: 1.0, speed: 6.0, hp: 750, power: 3, reward: 40, sense: 13, scale: 1.45, tint: 0xd6b79c,
     fact: "A scarred old raptor who has held the Hollow perch longer than anyone remembers. The glow in its eyes is new.",
     attacks: [
       L({ id: "lunge", name: "Lunge", windup: 0.8, strike: 0.36, recover: 1.1, reach: 5.2, arc: 0.3, damage: 1, speed: 13, range: [2, 8], cd: 1.2, weight: 3 }),
@@ -168,7 +168,7 @@ export const CREATURES: CreatureSpec[] = [
     },
   },
   {
-    id: "river-hunter", name: "River Hunter", sprite: "raptor", role: "lunger", archetype: "boss", level: 8, r: 1.0, speed: 6.2, hp: 260, power: 3, reward: 60, sense: 14, scale: 1.4, tint: 0xbcd0e8,
+    id: "river-hunter", name: "River Hunter", sprite: "raptor", role: "lunger", archetype: "boss", level: 8, r: 1.0, speed: 6.2, hp: 1076, power: 3, reward: 60, sense: 14, scale: 1.4, tint: 0xbcd0e8,
     fact: "Scarfang rules the river bend. Its stalking is patient, its pounce is not.",
     attacks: [
       L({ id: "lunge", name: "Lunge", windup: 0.78, strike: 0.36, recover: 1.1, reach: 5.2, arc: 0.3, damage: 1, speed: 13, range: [2, 8], cd: 1.1, weight: 3 }),
@@ -188,7 +188,7 @@ export const CREATURES: CreatureSpec[] = [
     },
   },
   {
-    id: "reed-stalker", name: "Reed Stalker", sprite: "raptor", role: "lunger", archetype: "boss", level: 13, r: 0.85, speed: 6.4, hp: 200, power: 3, reward: 50, sense: 14, scale: 1.2, tint: 0xa8d49c,
+    id: "reed-stalker", name: "Reed Stalker", sprite: "raptor", role: "lunger", archetype: "boss", level: 13, r: 0.85, speed: 6.4, hp: 625, power: 3, reward: 50, sense: 14, scale: 1.2, tint: 0xa8d49c,
     fact: "They hunt in alternating lunges: when one strikes, the other circles.",
     attacks: [
       L({ id: "lunge", name: "Lunge", windup: 0.78, strike: 0.36, recover: 1.1, reach: 5.2, arc: 0.3, damage: 1, speed: 13, range: [2, 8], cd: 1.2, weight: 3 }),
@@ -197,7 +197,7 @@ export const CREATURES: CreatureSpec[] = [
     boss: { title: "Marsh pack", arena: 30, armoured: false, phases: [{ at: 1, text: "", attacks: [], speed: 1, cd: 1 }, { at: 0.4, text: "The Reed Stalker fights desperately!", attacks: [], speed: 1.2, cd: 0.75 }] },
   },
   {
-    id: "sunscar", name: "Sunscar Stalker", sprite: "dilophosaurus", role: "lunger", archetype: "boss", level: 17, r: 1.2, speed: 5.4, hp: 420, power: 4, reward: 80, sense: 14, scale: 1.7, tint: 0xf2c890, keepAway: 6,
+    id: "sunscar", name: "Sunscar Stalker", sprite: "dilophosaurus", role: "lunger", archetype: "boss", level: 17, r: 1.2, speed: 5.4, hp: 1524, power: 4, reward: 80, sense: 14, scale: 1.7, tint: 0xf2c890, keepAway: 6,
     fact: "A dune-coloured crested hunter that fires venom in fans and hunts from the shade of the ridges.",
     attacks: [
       L({ id: "spit", kind: "spit", name: "Venom spit", windup: 0.8, strike: 0.2, recover: 1, reach: 14, damage: 0.8, speed: 12, range: [4, 14], cd: 2, venom: true, weight: 3 }),
@@ -217,7 +217,7 @@ export const CREATURES: CreatureSpec[] = [
     },
   },
   {
-    id: "gigano", name: "Basalt Matriarch", sprite: "gigano", role: "sweeper", archetype: "boss", level: 22, r: 1.7, speed: 4.4, hp: 520, power: 4, reward: 90, sense: 15, scale: 1,
+    id: "gigano", name: "Basalt Matriarch", sprite: "gigano", role: "sweeper", archetype: "boss", level: 22, r: 1.7, speed: 4.4, hp: 1800, power: 4, reward: 90, sense: 15, scale: 1,
     fact: "A giant of the south, with a long skull and heavy tail. Her sweep is slow; her recovery is the opening.",
     attacks: [
       L({ id: "sweep", kind: "sweep", name: "Tail sweep", windup: 1.0, strike: 0.5, recover: 1.5, reach: 5.8, arc: 1.7, damage: 1.5, cd: 1.6, weight: 3, knock: 2.5 }),
@@ -237,7 +237,7 @@ export const CREATURES: CreatureSpec[] = [
     },
   },
   {
-    id: "glimmerjaw", name: "The Glimmerjaw", sprite: "gigano", role: "sweeper", archetype: "boss", level: 27, r: 1.9, speed: 4.8, hp: 820, power: 4, reward: 140, sense: 10, scale: 1.18, tint: 0xffd98a,
+    id: "glimmerjaw", name: "The Glimmerjaw", sprite: "gigano", role: "sweeper", archetype: "boss", level: 27, r: 1.9, speed: 4.8, hp: 2180, power: 4, reward: 140, sense: 10, scale: 1.18, tint: 0xffd98a,
     fact: "What the Heartstone made of an ordinary hunter: bigger, brighter and never full.",
     attacks: [
       L({ id: "sweep", kind: "sweep", name: "Amber sweep", windup: 0.95, strike: 0.5, recover: 1.4, reach: 6.2, arc: 1.7, damage: 1.6, cd: 1.5, weight: 3, knock: 2.5 }),
